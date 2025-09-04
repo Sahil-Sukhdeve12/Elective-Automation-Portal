@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { Users, BookOpen, BarChart3, TrendingUp, Award, Clock } from 'lucide-react';
+import { Users, BookOpen, BarChart3, Star } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -16,13 +16,49 @@ const AdminDashboard: React.FC = () => {
   const totalElectives = electives.length;
   const totalSelections = studentElectives.length;
   
-  const domainStats = domains.map(domain => {
-    const domainSelections = studentElectives.filter(se => se.domain === domain.name);
+  // Categorize electives by electiveCategory
+  const electiveCategories = ['Humanities', 'Departmental', 'Open Elective'] as const;
+  
+  // Domain popularity by category
+  const categoryDomainStats = electiveCategories.map(category => {
+    const categoryElectives = electives.filter(e => e.electiveCategory === category);
+    const categorySelections = studentElectives.filter(se => {
+      const elective = electives.find(e => e.id === se.electiveId);
+      return elective?.electiveCategory === category;
+    });
+    
+    const domainStats = domains.map(domain => {
+      const domainCategoryElectives = categoryElectives.filter(e => e.domain === domain.name);
+      const domainCategorySelections = categorySelections.filter(se => se.domain === domain.name);
+      return {
+        ...domain,
+        selections: domainCategorySelections.length,
+        electives: domainCategoryElectives.length
+      };
+    }).filter(d => d.electives > 0).sort((a, b) => b.selections - a.selections);
+
     return {
-      ...domain,
-      selections: domainSelections.length
+      category,
+      domainStats,
+      totalElectives: categoryElectives.length,
+      totalSelections: categorySelections.length
     };
-  }).sort((a, b) => b.selections - a.selections);
+  });
+
+  // Most popular elective from each category
+  const popularElectivesByCategory = electiveCategories.map(category => {
+    const categoryElectives = electives.filter(e => e.electiveCategory === category);
+    const electivesWithSelections = categoryElectives.map(elective => {
+      const selections = studentElectives.filter(se => se.electiveId === elective.id).length;
+      return { ...elective, selections };
+    }).sort((a, b) => b.selections - a.selections);
+    
+    return {
+      category,
+      mostPopular: electivesWithSelections[0] || null,
+      totalElectives: categoryElectives.length
+    };
+  });
 
   const semesterStats = [5, 6, 7, 8].map(semester => {
     const semesterSelections = studentElectives.filter(se => se.semester === semester);
@@ -32,11 +68,6 @@ const AdminDashboard: React.FC = () => {
       electives: electives.filter(e => e.semester === semester).length
     };
   });
-
-  const popularElectives = electives.map(elective => {
-    const selections = studentElectives.filter(se => se.electiveId === elective.id).length;
-    return { ...elective, selections };
-  }).sort((a, b) => b.selections - a.selections).slice(0, 5);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -48,7 +79,7 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <Users className="w-8 h-8 text-blue-600" />
@@ -78,68 +109,68 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center">
-            <TrendingUp className="w-8 h-8 text-orange-600" />
-            <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{domains.length}</p>
-              <p className="text-gray-600">Active Domains</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Domain Popularity by Category */}
+        {categoryDomainStats.map((categoryData) => (
+          <div key={categoryData.category} className="bg-white p-6 rounded-lg shadow-sm border">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">
+              {categoryData.category} Domain Popularity
+            </h2>
+            <div className="space-y-4">
+              {categoryData.domainStats.slice(0, 4).map(domain => (
+                <div key={domain.id} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-4 h-4 rounded-full ${domain.color}`}></div>
+                    <span className="font-medium text-gray-900">{domain.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-gray-600">{domain.selections} selections</span>
+                    <div className="w-20 bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full ${domain.color}`}
+                        style={{
+                          width: `${Math.max(10, (domain.selections / Math.max(...categoryData.domainStats.map(d => d.selections), 1) * 100))}%`
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {categoryData.domainStats.length === 0 && (
+                <p className="text-gray-500 text-center py-4">No data available</p>
+              )}
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Domain Distribution */}
+        {/* Most Popular Electives by Category */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Domain Popularity</h2>
-          <div className="space-y-4">
-            {domainStats.map(domain => (
-              <div key={domain.id} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-4 h-4 rounded-full ${domain.color}`}></div>
-                  <span className="font-medium text-gray-900">{domain.name}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-600">{domain.selections} selections</span>
-                  <div className="w-20 bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${domain.color}`}
-                      style={{
-                        width: `${Math.max(10, (domain.selections / Math.max(...domainStats.map(d => d.selections)) * 100))}%`
-                      }}
-                    ></div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Most Popular by Category</h2>
+          <div className="space-y-6">
+            {popularElectivesByCategory.map((categoryData) => (
+              <div key={categoryData.category} className="border-l-4 border-blue-500 pl-4">
+                <h3 className="font-semibold text-gray-900 mb-2">{categoryData.category}</h3>
+                {categoryData.mostPopular ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-800">{categoryData.mostPopular.name}</p>
+                      <p className="text-sm text-gray-600">{categoryData.mostPopular.code} • {categoryData.mostPopular.domain}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center space-x-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                        <span className="font-bold text-gray-900">{categoryData.mostPopular.selections}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">selections</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Popular Electives */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Most Popular Electives</h2>
-          <div className="space-y-4">
-            {popularElectives.map((elective, index) => (
-              <div key={elective.id} className="flex items-center space-x-4">
-                <div className="flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                    index === 0 ? 'bg-yellow-500' :
-                    index === 1 ? 'bg-gray-400' :
-                    index === 2 ? 'bg-orange-500' : 'bg-gray-300'
-                  }`}>
-                    {index + 1}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">{elective.name}</h3>
-                  <p className="text-sm text-gray-600">{elective.code} • {elective.domain}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-gray-900">{elective.selections}</p>
-                  <p className="text-sm text-gray-600">selections</p>
-                </div>
+                ) : (
+                  <p className="text-gray-500">No electives in this category</p>
+                )}
               </div>
             ))}
           </div>
@@ -148,7 +179,7 @@ const AdminDashboard: React.FC = () => {
         {/* Semester Statistics */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Semester-wise Statistics</h2>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {semesterStats.map(stat => (
               <div key={stat.semester} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                 <div>
@@ -161,32 +192,6 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
-          <div className="space-y-4">
-            {studentElectives
-              .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-              .slice(0, 5)
-              .map((se, index) => {
-                const elective = electives.find(e => e.id === se.electiveId);
-                return (
-                  <div key={`${se.studentId}-${se.electiveId}`} className="flex items-center space-x-3">
-                    <Clock className="w-5 h-5 text-gray-400" />
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">
-                        Student selected <span className="font-medium">{elective?.name}</span>
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {new Date(se.completedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
           </div>
         </div>
       </div>

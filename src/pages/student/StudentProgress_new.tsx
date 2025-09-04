@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { BookOpen, Award, TrendingUp, Star, Target, Zap, ArrowRight, Clock } from 'lucide-react';
+import ProgressBar from '../../components/common/ProgressBar';
 
 const StudentProgress: React.FC = () => {
   const { user } = useAuth();
@@ -46,8 +47,21 @@ const StudentProgress: React.FC = () => {
     };
   });
   
-  // Calculate domains explored count
-  const domainsExplored = new Set(studentElectives.map(se => se.domain)).size;
+  const domainProgress = domains.map(domain => {
+    const domainElectives = studentElectives.filter(se => se.domain === domain.name);
+    const totalInDomain = electives.filter(e => e.domain === domain.name).length;
+    const electiveDetails = domainElectives.map(se => {
+      const elective = electives.find(e => e.id === se.electiveId);
+      return { ...se, elective };
+    });
+    
+    return {
+      ...domain,
+      completed: domainElectives.length,
+      total: totalInDomain,
+      electives: electiveDetails
+    };
+  });
 
   const totalElectivesCompleted = studentElectives.length;
   const totalCredits = studentElectives.reduce((sum, se) => {
@@ -144,7 +158,7 @@ const StudentProgress: React.FC = () => {
             <TrendingUp className="w-8 h-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">
-                {domainsExplored}
+                {domainProgress.filter(d => d.completed > 0).length}
               </p>
               <p className="text-gray-600">Domains Explored</p>
             </div>
@@ -260,6 +274,45 @@ const StudentProgress: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Domain Progress Overview */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-semibold text-gray-900 mb-6">Domain Progress Overview</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {domainProgress.map(domain => (
+            <div key={domain.id} className="bg-white p-6 rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-4 h-4 rounded-full ${domain.color}`}></div>
+                  <h3 className="text-lg font-semibold text-gray-900">{domain.name}</h3>
+                </div>
+                <span className="text-sm text-gray-600">
+                  {domain.completed}/{domain.total} completed
+                </span>
+              </div>
+              
+              <ProgressBar 
+                progress={(domain.completed / Math.max(domain.total, 1)) * 100} 
+                className="mb-4"
+              />
+              
+              {domain.electives.length > 0 ? (
+                <div className="space-y-2">
+                  {domain.electives.map(se => (
+                    <div key={`${se.studentId}-${se.electiveId}`} className="flex items-center space-x-2 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="font-medium">{se.elective?.name}</span>
+                      <span className="text-gray-500">• Sem {se.semester}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No electives completed in this domain yet</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Academic Timeline */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">

@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import type { Elective } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, BookOpen, X, Download, FileText } from 'lucide-react';
 
 const AdminElectives: React.FC = () => {
-  const { electives, domains, addElective, updateElective, deleteElective } = useData();
+  const { electives, domains, addElective, updateElective, deleteElective, exportDataAsExcel, exportDataAsPDF } = useData();
   const { addNotification } = useNotifications();
   
   const [showModal, setShowModal] = useState(false);
@@ -117,6 +117,40 @@ const AdminElectives: React.FC = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    try {
+      exportDataAsExcel();
+      addNotification({
+        type: 'success',
+        title: 'Export Successful',
+        message: 'Data exported to Excel successfully.'
+      });
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export data to Excel. Please try again.'
+      });
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      exportDataAsPDF();
+      addNotification({
+        type: 'success',
+        title: 'Export Successful',
+        message: 'Data exported to PDF successfully.'
+      });
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        title: 'Export Failed',
+        message: 'Failed to export data to PDF. Please try again.'
+      });
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -214,6 +248,20 @@ const AdminElectives: React.FC = () => {
           </p>
         </div>
         <div className="flex space-x-3">
+          <button
+            onClick={handleExportExcel}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Export PDF
+          </button>
           <button
             onClick={() => handleOpenModal()}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"

@@ -13,6 +13,8 @@ export interface Elective {
   category: 'Theory' | 'Practical';
   electiveCategory: 'Humanities' | 'Departmental' | 'Open Elective';
   infoImage?: string; // URL or base64 string for the info image
+  selectionDeadline?: string; // ISO date string for deadline
+  futureOptions?: string[]; // Array of elective IDs that become available after this
 }
 
 export interface Domain {
@@ -30,12 +32,32 @@ export interface StudentElective {
   semester: number;
   domain: string;
   completedAt: Date;
+  feedback?: {
+    rating: number;
+    comment: string;
+    submittedAt: Date;
+  };
+}
+
+export interface ElectiveFeedbackForm {
+  id: string;
+  studentId: string;
+  previousElectiveId: string;
+  semester: number;
+  feedback: {
+    rating: number;
+    comment: string;
+    wouldRecommend: boolean;
+    improvements: string;
+  };
+  submittedAt: Date;
 }
 
 interface DataContextType {
   electives: Elective[];
   domains: Domain[];
   studentElectives: StudentElective[];
+  electiveFeedbacks: ElectiveFeedbackForm[];
   addElective: (elective: Omit<Elective, 'id'>) => void;
   updateElective: (id: string, elective: Partial<Elective>) => void;
   deleteElective: (id: string) => void;
@@ -46,6 +68,14 @@ interface DataContextType {
   getDomainsByDepartment: (department: string) => Domain[];
   getElectivesByCategory: (category: 'Humanities' | 'Departmental' | 'Open Elective') => Elective[];
   getElectivesByCategoryAndDepartment: (category: 'Humanities' | 'Departmental' | 'Open Elective', department: string) => Elective[];
+  setElectiveDeadline: (electiveId: string, deadline: string) => void;
+  getElectiveDeadline: (electiveId: string) => string | null;
+  isElectiveSelectionOpen: (electiveId: string) => boolean;
+  addElectiveFeedback: (feedback: Omit<ElectiveFeedbackForm, 'id'>) => void;
+  getFutureElectives: (currentElectiveId: string) => Elective[];
+  exportDataAsExcel: () => void;
+  exportDataAsPDF: () => void;
+  getElectiveRecommendation: (studentId: string, userPreferences: { interests: string[]; careerGoals: string; difficulty: string }) => Elective[];
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -455,11 +485,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [electives, setElectives] = useState<Elective[]>([]);
   const [domains] = useState<Domain[]>(initialDomains);
   const [studentElectives, setStudentElectives] = useState<StudentElective[]>([]);
+  const [electiveFeedbacks, setElectiveFeedbacks] = useState<ElectiveFeedbackForm[]>([]);
 
   useEffect(() => {
     // Initialize data from localStorage or use defaults
     const storedElectives = localStorage.getItem('electives');
     const storedStudentElectives = localStorage.getItem('studentElectives');
+    const storedElectiveFeedbacks = localStorage.getItem('electiveFeedbacks');
 
     if (storedElectives) {
       setElectives(JSON.parse(storedElectives));
@@ -470,6 +502,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (storedStudentElectives) {
       setStudentElectives(JSON.parse(storedStudentElectives));
+    }
+
+    if (storedElectiveFeedbacks) {
+      setElectiveFeedbacks(JSON.parse(storedElectiveFeedbacks));
     }
   }, []);
 
@@ -555,11 +591,194 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return electives.filter(e => e.electiveCategory === category && (category !== 'Departmental' || e.department === department));
   };
 
+  // New functions for additional features
+  const setElectiveDeadline = (electiveId: string, deadline: string) => {
+    setElectives(prev => prev.map(e => 
+      e.id === electiveId ? { ...e, selectionDeadline: deadline } : e
+    ));
+    localStorage.setItem('electives', JSON.stringify(electives));
+  };
+
+  const getElectiveDeadline = (electiveId: string): string | null => {
+    const elective = electives.find(e => e.id === electiveId);
+    return elective?.selectionDeadline || null;
+  };
+
+  const isElectiveSelectionOpen = (electiveId: string): boolean => {
+    const deadline = getElectiveDeadline(electiveId);
+    if (!deadline) return true; // No deadline set means always open
+    return new Date() <= new Date(deadline);
+  };
+
+  const addElectiveFeedback = (feedback: Omit<ElectiveFeedbackForm, 'id'>) => {
+    const newFeedback: ElectiveFeedbackForm = {
+      ...feedback,
+      id: Date.now().toString()
+    };
+    setElectiveFeedbacks(prev => [...prev, newFeedback]);
+    localStorage.setItem('electiveFeedbacks', JSON.stringify([...electiveFeedbacks, newFeedback]));
+  };
+
+  const getFutureElectives = (currentElectiveId: string): Elective[] => {
+    const currentElective = electives.find(e => e.id === currentElectiveId);
+    if (!currentElective || !currentElective.futureOptions) return [];
+    
+    return electives.filter(e => currentElective.futureOptions?.includes(e.id));
+  };
+
+  const exportDataAsExcel = () => {
+    import('xlsx').then((XLSX) => {
+      // Prepare data for Excel export
+      const electiveData = electives.map(e => ({
+        'Elective Name': e.name,
+        'Code': e.code,
+        'Semester': e.semester,
+        'Domain': e.domain,
+        'Department': e.department,
+        'Category': e.category,
+        'Elective Category': e.electiveCategory,
+        'Credits': e.credits,
+        'Description': e.description,
+        'Prerequisites': e.prerequisites?.length || 0,
+        'Selection Deadline': e.selectionDeadline ? new Date(e.selectionDeadline).toLocaleDateString() : 'No deadline'
+      }));
+
+      const studentElectiveData = studentElectives.map(se => {
+        const elective = electives.find(e => e.id === se.electiveId);
+        return {
+          'Student ID': se.studentId,
+          'Elective Name': elective?.name || 'Unknown',
+          'Code': elective?.code || 'Unknown',
+          'Semester': se.semester,
+          'Domain': se.domain,
+          'Department': elective?.department || 'Unknown',
+          'Credits': elective?.credits || 0,
+          'Completed Date': se.completedAt.toLocaleDateString()
+        };
+      });
+
+      // Create workbook with multiple sheets
+      const wb = XLSX.utils.book_new();
+      
+      // Add electives sheet
+      const electiveWs = XLSX.utils.json_to_sheet(electiveData);
+      XLSX.utils.book_append_sheet(wb, electiveWs, 'Electives');
+      
+      // Add student selections sheet
+      const studentWs = XLSX.utils.json_to_sheet(studentElectiveData);
+      XLSX.utils.book_append_sheet(wb, studentWs, 'Student Selections');
+
+      // Download file
+      XLSX.writeFile(wb, `elective_data_${new Date().toISOString().split('T')[0]}.xlsx`);
+    });
+  };
+
+  const exportDataAsPDF = () => {
+    import('jspdf').then(({ default: jsPDF }) => {
+      import('jspdf-autotable').then(() => {
+        const doc = new jsPDF() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+        
+        // Title
+        doc.setFontSize(20);
+        doc.text('Elective Selection Report', 20, 20);
+        
+        // Date
+        doc.setFontSize(12);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 35);
+        
+        // Student Selections Table
+        doc.setFontSize(16);
+        doc.text('Student Elective Selections', 20, 50);
+        
+        const studentTableData = studentElectives.map(se => {
+          const elective = electives.find(e => e.id === se.electiveId);
+          return [
+            se.studentId,
+            elective?.name || 'Unknown',
+            elective?.code || 'Unknown',
+            se.semester.toString(),
+            se.domain,
+            elective?.department || 'Unknown',
+            (elective?.credits || 0).toString(),
+            se.completedAt.toLocaleDateString()
+          ];
+        });
+
+        doc.autoTable({
+          head: [['Student ID', 'Elective Name', 'Code', 'Semester', 'Domain', 'Department', 'Credits', 'Date']],
+          body: studentTableData,
+          startY: 60,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [41, 98, 255] }
+        });
+
+        // Electives Summary
+        const finalY = doc.lastAutoTable.finalY + 20;
+        doc.setFontSize(16);
+        doc.text('Electives Summary', 20, finalY);
+        
+        const electiveTableData = electives.map(e => [
+          e.name,
+          e.code,
+          e.semester.toString(),
+          e.domain,
+          e.department,
+          e.electiveCategory,
+          e.credits.toString()
+        ]);
+
+        doc.autoTable({
+          head: [['Name', 'Code', 'Semester', 'Domain', 'Department', 'Category', 'Credits']],
+          body: electiveTableData,
+          startY: finalY + 10,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [34, 197, 94] }
+        });
+
+        // Save the PDF
+        doc.save(`elective_report_${new Date().toISOString().split('T')[0]}.pdf`);
+      });
+    });
+  };
+
+  const getElectiveRecommendation = (
+    studentId: string, 
+    userPreferences: { interests: string[]; careerGoals: string; difficulty: string }
+  ): Elective[] => {
+    const studentElectiveHistory = getStudentElectives(studentId);
+    const completedElectiveIds = studentElectiveHistory.map(se => se.electiveId);
+    
+    return electives
+      .filter(e => !completedElectiveIds.includes(e.id))
+      .sort((a, b) => {
+        let scoreA = 0;
+        let scoreB = 0;
+        
+        // Score based on interests (domain matching)
+        if (userPreferences.interests.includes(a.domain)) scoreA += 3;
+        if (userPreferences.interests.includes(b.domain)) scoreB += 3;
+        
+        // Score based on career goals (simple keyword matching)
+        if (a.description.toLowerCase().includes(userPreferences.careerGoals.toLowerCase())) scoreA += 2;
+        if (b.description.toLowerCase().includes(userPreferences.careerGoals.toLowerCase())) scoreB += 2;
+        
+        // Score based on difficulty preference
+        if (userPreferences.difficulty === 'easy' && a.category === 'Theory') scoreA += 1;
+        if (userPreferences.difficulty === 'easy' && b.category === 'Theory') scoreB += 1;
+        if (userPreferences.difficulty === 'challenging' && a.category === 'Practical') scoreA += 1;
+        if (userPreferences.difficulty === 'challenging' && b.category === 'Practical') scoreB += 1;
+        
+        return scoreB - scoreA; // Higher score first
+      })
+      .slice(0, 5); // Return top 5 recommendations
+  };
+
   return (
     <DataContext.Provider value={{
       electives,
       domains,
       studentElectives,
+      electiveFeedbacks,
       addElective,
       updateElective,
       deleteElective,
@@ -570,6 +789,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       getDomainsByDepartment,
       getElectivesByCategory,
       getElectivesByCategoryAndDepartment,
+      setElectiveDeadline,
+      getElectiveDeadline,
+      isElectiveSelectionOpen,
+      addElectiveFeedback,
+      getFutureElectives,
+      exportDataAsExcel,
+      exportDataAsPDF,
+      getElectiveRecommendation,
     }}>
       {children}
     </DataContext.Provider>

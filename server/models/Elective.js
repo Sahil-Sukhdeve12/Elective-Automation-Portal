@@ -1,0 +1,93 @@
+const mongoose = require('mongoose');
+
+const electiveSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  code: {
+    type: String,
+    required: true,
+    unique: true,
+    uppercase: true
+  },
+  semester: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 8
+  },
+  domain: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String,
+    required: true
+  },
+  prerequisites: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Elective'
+  }],
+  credits: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 6
+  },
+  department: {
+    type: String,
+    required: true
+  },
+  category: {
+    type: String,
+    enum: ['Theory', 'Practical'],
+    required: true
+  },
+  electiveCategory: {
+    type: String,
+    enum: ['Humanities', 'Departmental', 'Open Elective'],
+    required: true
+  },
+  infoImage: {
+    type: String, // Base64 encoded image or file path
+  },
+  selectionDeadline: {
+    type: Date
+  },
+  futureOptions: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Elective'
+  }],
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Update the updatedAt field before saving
+electiveSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
+// Index for better query performance
+electiveSchema.index({ semester: 1, department: 1, electiveCategory: 1 });
+electiveSchema.index({ domain: 1 });
+electiveSchema.index({ code: 1 });
+
+module.exports = mongoose.model('Elective', electiveSchema);

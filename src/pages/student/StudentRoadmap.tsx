@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { Map, Star, CheckCircle, Clock, Book, Users, Globe, Target, TrendingUp, Award, Lightbulb } from 'lucide-react';
+import { Map, Star, CheckCircle, Clock, Book, Users, Globe, Target, TrendingUp, Award, Lightbulb, ArrowRight, AlertTriangle } from 'lucide-react';
 
 const StudentRoadmap: React.FC = () => {
   const { user } = useAuth();
-  const { getElectivesByCategoryAndDepartment, getStudentElectives, getDomainsByDepartment } = useData();
+  const { getElectivesByCategoryAndDepartment, getStudentElectives, getDomainsByDepartment, electives, getFutureElectives } = useData();
   const [selectedCategory, setSelectedCategory] = useState<'Departmental' | 'Humanities' | 'Open Elective'>('Departmental');
 
   if (!user || user.role !== 'student') return null;
@@ -48,12 +48,34 @@ const StudentRoadmap: React.FC = () => {
       const elective = categoryElectives.find(e => e.id === se.electiveId);
       return elective?.electiveCategory === category;
     }).length;
+
+    const requiredCount = category === 'Departmental' ? 4 : 2; // Example requirements
     
-    const requiredCount = category === 'Departmental' ? 4 : category === 'Humanities' ? 2 : 2; // Example requirements
-    return { completed: completedCount, required: requiredCount, total: categoryElectives.length };
+    return {
+      completed: completedCount,
+      required: requiredCount,
+      remaining: Math.max(0, requiredCount - completedCount)
+    };
   };
 
-  const getRecommendations = () => {
+  const getFutureRoadmap = () => {
+    const lastCompletedElective = studentElectives
+      .filter(se => se.semester === currentSemester - 1)
+      .pop();
+    
+    if (!lastCompletedElective) return [];
+
+    const futureOptions = getFutureElectives(lastCompletedElective.electiveId);
+    return futureOptions.map(elective => ({
+      ...elective,
+      semesterAvailable: elective.semester,
+      benefits: [
+        `Builds on ${lastCompletedElective.domain} knowledge`,
+        `Opens pathway to advanced ${elective.domain} courses`,
+        `Enhances career prospects in ${elective.domain}`,
+      ]
+    }));
+  };  const getRecommendations = () => {
     if (!user.department) return { suggestions: [], nextSemesterRecommendations: [] };
     
     const departmentalElectives = getElectivesForCategory('Departmental');
@@ -156,7 +178,7 @@ const StudentRoadmap: React.FC = () => {
                       ></div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {progress.total} total available
+                      {progress.remaining} remaining
                     </p>
                   </div>
                 );
@@ -368,6 +390,81 @@ const StudentRoadmap: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Future Roadmap Section */}
+            {(() => {
+              const futureOptions = getFutureRoadmap();
+              return futureOptions.length > 0 && (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg p-6 mt-8">
+                  <div className="flex items-center mb-6">
+                    <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400 mr-3" />
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Your Future Pathway
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Based on your previous elective, here's what becomes available next
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {futureOptions.map((elective) => (
+                      <div
+                        key={elective.id}
+                        className="bg-white dark:bg-gray-800 rounded-lg p-4 border-l-4 border-green-500 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="font-medium text-gray-900 dark:text-white">
+                              {elective.name}
+                            </h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                              {elective.code} • Semester {elective.semesterAvailable}
+                            </p>
+                          </div>
+                          <span className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded-full text-xs font-medium">
+                            Next
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-700 dark:text-gray-300 mb-3">
+                          {elective.description.substring(0, 80)}...
+                        </p>
+
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-medium text-gray-900 dark:text-white">
+                            Benefits:
+                          </h5>
+                          <ul className="space-y-1">
+                            {elective.benefits.slice(0, 2).map((benefit, idx) => (
+                              <li key={idx} className="text-xs text-gray-600 dark:text-gray-400 flex items-start">
+                                <ArrowRight className="w-3 h-3 mr-1 mt-0.5 text-green-500 flex-shrink-0" />
+                                {benefit}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                    <div className="flex items-start">
+                      <Lightbulb className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
+                          Planning Tip
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Consider your career goals when choosing from these options. Each choice opens different pathways.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Tips and Guidelines */}
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-6 mt-8">

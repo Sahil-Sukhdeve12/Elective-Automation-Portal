@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { useFeedback } from '../../contexts/FeedbackContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { BookOpen, Check, Star, MessageSquare, Clock } from 'lucide-react';
+import { BookOpen, Check, Star, MessageSquare, Info, Clock, AlertCircle, Target } from 'lucide-react';
 import ElectiveFeedback from '../../components/common/ElectiveFeedback';
+import ElectiveInfoModal from '../../components/common/ElectiveInfoModal';
+import PreviousElectiveFeedback from '../../components/common/PreviousElectiveFeedback';
+import ElectiveRecommendation from '../../components/common/ElectiveRecommendation';
 
 const StudentElectives: React.FC = () => {
   const { user, markUserAsExperienced } = useAuth();
@@ -14,53 +17,54 @@ const StudentElectives: React.FC = () => {
     selectElective, 
     getDomainsByDepartment,
     isElectiveSelectionOpen,
-    getFutureElectives
+    getFutureElectives,
+    addElectiveFeedback,
+    getElectiveRecommendation
   } = useData();
   const { getAverageRating, hasUserRated, addFeedback } = useFeedback();
   const { addNotification } = useNotifications();
   
   const [selectedDomain, setSelectedDomain] = useState('');
+  const [selectedElective, setSelectedElective] = useState<string | null>(null);
   const [feedbackElective, setFeedbackElective] = useState<string | null>(null);
+  const [infoElective, setInfoElective] = useState<string | null>(null);
+  const [showPreviousFeedback, setShowPreviousFeedback] = useState(false);
+  const [previousSemesterElective, setPreviousSemesterElective] = useState<string | null>(null);
 
-  // Early return check - but after hooks
-  const currentSemester = user?.semester || 5;
-  const studentElectives = useMemo(() => user ? getStudentElectives(user.id) : [], [user, getStudentElectives]);
-  const completedElectiveIds = studentElectives.map(se => se.electiveId);
-  
-  // Filter electives for current semester and not already completed
-  const currentSemesterElectives = electives.filter(e => 
-    e.semester === currentSemester && 
-    !completedElectiveIds.includes(e.id)
-  );
-
-  // Show notification when new electives become available for updated semester
+  // Check for previous semester elective to request feedback
   useEffect(() => {
-    if (!user || currentSemesterElectives.length === 0) return;
+    if (!user) return;
     
-    // Check if this is a semester change (new electives available)
-    const lastNotificationSemester = localStorage.getItem(`lastNotificationSemester_${user.id}`);
-    if (lastNotificationSemester !== currentSemester.toString() && currentSemesterElectives.length > 0) {
-      // Only show notification if there are actually new electives for this semester
-      const hasNotSeenTheseBefore = !studentElectives.some(se => se.semester === currentSemester);
-      
-      if (hasNotSeenTheseBefore) {
-        addNotification({
-          type: 'info',
-          title: 'New Electives Available!',
-          message: `${currentSemesterElectives.length} electives are now available for Semester ${currentSemester}. Check them out below!`
-        });
-        localStorage.setItem(`lastNotificationSemester_${user.id}`, currentSemester.toString());
+    const currentSemester = user.semester || 5;
+    const studentElectives = getStudentElectives(user.id);
+    const previousSemesterElectives = studentElectives.filter(se => se.semester === currentSemester - 1);
+    
+    if (previousSemesterElectives.length > 0 && !showPreviousFeedback) {
+      const lastElective = previousSemesterElectives[previousSemesterElectives.length - 1];
+      // Check if feedback already given
+      const hasGivenFeedback = localStorage.getItem(`feedback_${user.id}_${lastElective.electiveId}`);
+      if (!hasGivenFeedback) {
+        setPreviousSemesterElective(lastElective.electiveId);
+        setShowPreviousFeedback(true);
       }
     }
-  }, [user, currentSemester, currentSemesterElectives.length, studentElectives, addNotification]);
+  }, [user, getStudentElectives, showPreviousFeedback]);
 
   if (!user || user.role !== 'student') return null;
 
-  // Check if student has already selected an elective for the current semester
+  const currentSemester = user.semester || 5;
+  const studentElectives = getStudentElectives(user.id);
+  const completedElectiveIds = studentElectives.map(se => se.electiveId);
   const hasSelectedThisSemester = studentElectives.some(se => se.semester === currentSemester);
   
   // Get domains and electives specific to user's department
   const departmentDomains = getDomainsByDepartment(user.department || '');
+  
+  // Filter electives for current semester (considering user's updated semester)
+  const currentSemesterElectives = electives.filter(e => 
+    e.semester === currentSemester && 
+    !completedElectiveIds.includes(e.id)
+  );
   
   // Get current track for recommendations
   const trackAnalysis = departmentDomains.map(domain => ({
@@ -110,6 +114,7 @@ const StudentElectives: React.FC = () => {
       title: 'Elective Selected!',
       message: 'Your elective has been successfully registered for this semester.'
     });
+    setSelectedElective(electiveId);
   };
 
   const handleFeedbackSubmit = (feedback: { rating: number; comment: string }) => {
@@ -125,6 +130,43 @@ const StudentElectives: React.FC = () => {
         message: 'Thank you for your valuable feedback!'
       });
     }
+  };
+
+  const handlePreviousFeedbackSubmit = (feedback: {
+    rating: number;
+    comment: string;
+    wouldRecommend: boolean;
+    improvements: string;
+  }) => {
+    if (previousSemesterElective) {
+      addElectiveFeedback({
+        studentId: user.id,
+        previousElectiveId: previousSemesterElective,
+        semester: currentSemester - 1,
+        feedback,
+        submittedAt: new Date()
+      });
+      
+      // Mark feedback as given
+      localStorage.setItem(`feedback_${user.id}_${previousSemesterElective}`, 'true');
+      
+      addNotification({
+        type: 'success',
+        title: 'Feedback Submitted',
+        message: 'Thank you for sharing your experience! This will help other students.'
+      });
+      
+      setShowPreviousFeedback(false);
+      setPreviousSemesterElective(null);
+    }
+  };
+
+  const handleGetRecommendations = (preferences: {
+    interests: string[];
+    careerGoals: string;
+    difficulty: string;
+  }) => {
+    return getElectiveRecommendation(user.id, preferences);
   };
 
   const getDomainColor = (domainName: string) => {
@@ -301,6 +343,13 @@ const StudentElectives: React.FC = () => {
                         </span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => setInfoElective(elective.id)}
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="View elective information"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <p className="text-gray-700 mb-4 text-sm">{elective.description}</p>
@@ -385,6 +434,13 @@ const StudentElectives: React.FC = () => {
                         </span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => setInfoElective(elective.id)}
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="View elective information"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <p className="text-gray-700 mb-4 text-sm">{elective.description}</p>
@@ -481,6 +537,13 @@ const StudentElectives: React.FC = () => {
                         </span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => setInfoElective(elective.id)}
+                      className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                      title="View elective information"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
                   </div>
 
                   <p className="text-gray-700 mb-4 text-sm">{elective.description}</p>
@@ -557,12 +620,38 @@ const StudentElectives: React.FC = () => {
       {feedbackElective && (
         <ElectiveFeedback
           electiveId={feedbackElective}
-          electiveName={electives.find(e => e.id === feedbackElective)?.name || ''}
-          isOpen={true}
           onSubmit={handleFeedbackSubmit}
           onClose={() => setFeedbackElective(null)}
         />
       )}
+
+      {/* Info Modal */}
+      {infoElective && (
+        <ElectiveInfoModal
+          elective={electives.find(e => e.id === infoElective)!}
+          onClose={() => setInfoElective(null)}
+        />
+      )}
+
+      {/* Previous Semester Feedback Modal */}
+      {showPreviousFeedback && previousSemesterElective && (
+        <PreviousElectiveFeedback
+          elective={electives.find(e => e.id === previousSemesterElective)!}
+          onSubmit={handlePreviousFeedbackSubmit}
+          onClose={() => {
+            setShowPreviousFeedback(false);
+            setPreviousSemesterElective(null);
+          }}
+        />
+      )}
+
+      {/* AI Recommendation Component */}
+      <ElectiveRecommendation
+        onGetRecommendations={handleGetRecommendations}
+        availableElectives={currentSemesterElectives}
+        onSelectElective={handleElectiveSelect}
+        disabled={hasSelectedThisSemester}
+      />
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { BookOpen, Award, TrendingUp, Star, Target, Zap, ArrowRight, Clock } from 'lucide-react';
+import { BookOpen, Calendar, Award, TrendingUp, Check, Star, Target, Zap } from 'lucide-react';
+import ProgressBar from '../../components/common/ProgressBar';
 
 const StudentProgress: React.FC = () => {
   const { user } = useAuth();
@@ -46,8 +47,21 @@ const StudentProgress: React.FC = () => {
     };
   });
   
-  // Calculate domains explored count
-  const domainsExplored = new Set(studentElectives.map(se => se.domain)).size;
+  const domainProgress = domains.map(domain => {
+    const domainElectives = studentElectives.filter(se => se.domain === domain.name);
+    const totalInDomain = electives.filter(e => e.domain === domain.name).length;
+    const electiveDetails = domainElectives.map(se => {
+      const elective = electives.find(e => e.id === se.electiveId);
+      return { ...se, elective };
+    });
+    
+    return {
+      ...domain,
+      completed: domainElectives.length,
+      total: totalInDomain,
+      electives: electiveDetails
+    };
+  });
 
   const totalElectivesCompleted = studentElectives.length;
   const totalCredits = studentElectives.reduce((sum, se) => {
@@ -64,25 +78,11 @@ const StudentProgress: React.FC = () => {
 
   // Current semester recommendations
   const currentSemester = user.semester || 5;
-  const nextSemester = currentSemester + 1;
-  
-  // Get current track (most common domain in completed electives)
-  const trackAnalysis = domains.map(domain => ({
-    domain: domain.name,
-    count: studentElectives.filter(se => se.domain === domain.name).length,
-    color: domain.color
-  })).sort((a, b) => b.count - a.count);
-  
-  const currentTrack = trackAnalysis[0]?.domain || '';
-  
-  // Recommend electives for next semester based on current track
-  const nextSemesterElectives = electives.filter(e => 
-    e.semester === nextSemester && 
+  const hasSelectedThisSemester = studentElectives.some(se => se.semester === currentSemester);
+  const availableElectives = electives.filter(e => 
+    e.semester === currentSemester && 
     !studentElectives.some(se => se.electiveId === e.id)
   );
-  
-  const recommendedElectives = nextSemesterElectives.filter(e => e.domain === currentTrack);
-  const otherElectives = nextSemesterElectives.filter(e => e.domain !== currentTrack);
 
   // Get expertise level icon and color
   const getExpertiseIcon = (level: string) => {
@@ -144,7 +144,7 @@ const StudentProgress: React.FC = () => {
             <TrendingUp className="w-8 h-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">
-                {domainsExplored}
+                {domainProgress.filter(d => d.completed > 0).length}
               </p>
               <p className="text-gray-600">Domains Explored</p>
             </div>
@@ -189,113 +189,104 @@ const StudentProgress: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {/* Next Semester Recommendations */}
-      {nextSemesterElectives.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">
-            Semester {nextSemester} Recommendations
-          </h2>
-          
-          {currentTrack && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <Target className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-900">Your Current Track: {currentTrack}</span>
-              </div>
-              <p className="text-sm text-blue-700 mt-1">
-                Based on your completed electives, these recommendations align with your learning path.
-              </p>
+              <p className="text-gray-600">Domains Explored</p>
             </div>
-          )}
-
-          {recommendedElectives.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Star className="w-5 h-5 text-yellow-500 mr-2" />
-                Recommended for You
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {recommendedElectives.map(elective => (
-                  <div key={elective.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{elective.name}</h4>
-                      <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                        Recommended
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{elective.code} • {elective.credits} Credits</p>
-                    <p className="text-sm text-gray-700 mb-3">{elective.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getDomainColor(elective.domain)}`}>
-                        {elective.domain}
-                      </span>
-                      <span className="text-xs text-gray-500">{elective.electiveCategory}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {otherElectives.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Other Available Electives</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {otherElectives.map(elective => (
-                  <div key={elective.id} className="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">{elective.name}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{elective.code} • {elective.credits} Credits</p>
-                    <p className="text-sm text-gray-700 mb-3">{elective.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getDomainColor(elective.domain)}`}>
-                        {elective.domain}
-                      </span>
-                      <span className="text-xs text-gray-500">{elective.electiveCategory}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Academic Timeline */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-6">Academic Timeline</h2>
-        {electiveHistory.length > 0 ? (
-          <div className="space-y-4">
-            {electiveHistory.map((se) => (
-              <div key={`${se.studentId}-${se.electiveId}`} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900">{se.elective?.name}</h4>
-                  <p className="text-sm text-gray-600">
-                    {se.elective?.code} • Semester {se.semester} • {se.domain}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-medium text-gray-900">{se.elective?.credits} Credits</span>
-                  <p className="text-xs text-gray-500">
-                    {new Date(se.completedAt).toLocaleDateString()}
-                  </p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Domain Progress */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Domain Expertise</h2>
+          <div className="space-y-6">
+            {domainProgress.map(domain => (
+              <div key={domain.id} className="space-y-3">
+                <ProgressBar
+                  progress={domain.completed}
+                  total={domain.total}
+                  label={domain.name}
+                  color={domain.color}
+                />
+                <div className="ml-4 space-y-2">
+                  {domain.electives.map(se => (
+                    <div key={se.electiveId} className="flex items-center text-sm">
+                      <Check className="w-4 h-4 text-green-500 mr-2" />
+                      <span className="text-gray-700">
+                        {se.elective?.name} ({se.elective?.code}) - Sem {se.semester}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No electives completed yet</h3>
-            <p className="text-gray-600">Start your elective journey to see your progress here.</p>
-          </div>
-        )}
+        </div>
+
+        {/* Elective Timeline */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Elective Timeline</h2>
+          {electiveHistory.length > 0 ? (
+            <div className="space-y-4">
+              {electiveHistory.map((se, index) => (
+                <div key={se.electiveId} className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">{index + 1}</span>
+                    </div>
+                    {index !== electiveHistory.length - 1 && (
+                      <div className="w-px h-6 bg-gray-300 mx-auto mt-2"></div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900">{se.elective?.name}</h3>
+                    <p className="text-sm text-gray-600">
+                      {se.elective?.code} • Semester {se.semester} • {se.elective?.domain}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">{se.elective?.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No electives completed yet</p>
+              <p className="text-sm text-gray-500 mt-1">Start selecting electives to see your timeline</p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Current Semester Recommendations */}
+      {!hasSelectedThisSemester && (
+        <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border">
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">
+            Available for Semester {currentSemester}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableElectives.map(elective => (
+              <div key={elective.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-gray-900">{elective.name}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getDomainColor(elective.domain)}`}>
+                    {elective.domain}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">{elective.code} • {elective.credits} Credits</p>
+                <p className="text-gray-700 mb-4">{elective.description}</p>
+                
+                <button
+                  onClick={() => handleElectiveSelect(elective.id)}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Select This Elective
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

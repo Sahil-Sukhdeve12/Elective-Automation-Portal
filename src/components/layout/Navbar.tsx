@@ -32,7 +32,6 @@ const Navbar: React.FC = () => {
     { path: '/admin', label: 'Dashboard', icon: BarChart3 },
     { path: '/admin/electives', label: 'Manage Electives', icon: BookOpen },
     { path: '/admin/students', label: 'Students', icon: User },
-    { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   ];
 
   const navItems = user.role === 'admin' ? adminNavItems : studentNavItems;

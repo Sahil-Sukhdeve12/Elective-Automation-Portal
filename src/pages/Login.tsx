@@ -85,24 +85,24 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
-      <div className="max-w-md w-full space-y-8">
+    <div className="h-screen w-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900 flex justify-center px-4 sm:px-6 lg:px-8 transition-colors duration-200 fixed inset-0">
+      <div className="max-w-md w-full py-4 flex flex-col justify-center">
         <div className="text-center">
           <div className="flex justify-center">
-            <GraduationCap className="w-16 h-16 text-blue-600" />
+            <GraduationCap className="w-12 h-12 text-blue-600" />
           </div>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
-            Welcome to ElectivePro
+          <h2 className="mt-3 text-2xl font-extrabold text-gray-900 dark:text-white">
+            Welcome to Elective Selection Portal
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
             Sign in to your account to continue
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                 Email Address
               </label>
               <div className="mt-1 relative">
@@ -123,7 +123,7 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                 Password
               </label>
               <div className="mt-1 relative">
@@ -219,7 +219,7 @@ const Login: React.FC = () => {
             
             <form onSubmit={handleForgotPassword}>
               <div className="mb-4">
-                <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
                   Email Address
                 </label>
                 <div className="relative">

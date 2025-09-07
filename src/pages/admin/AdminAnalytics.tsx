@@ -3,19 +3,19 @@ import { useData } from '../../contexts/DataContext';
 import { BarChart3, TrendingUp, Users, BookOpen, Award, Target, Download } from 'lucide-react';
 
 const AdminAnalytics: React.FC = () => {
-  const { electives, domains, studentElectives } = useData();
+  const { electives, tracks, studentElectives } = useData();
 
   const students = JSON.parse(localStorage.getItem('users') || '[]')
     .filter((u: any) => u.role === 'student');
 
   const analytics = useMemo(() => {
-    // Domain analytics
-    const domainStats = domains.map(domain => {
-      const domainSelections = studentElectives.filter(se => se.domain === domain.name);
-      const uniqueStudents = new Set(domainSelections.map(se => se.studentId)).size;
+    // track analytics
+    const trackstats = tracks.map(track => {
+      const trackselections = studentElectives.filter(se => se.track === track.name);
+      const uniqueStudents = new Set(trackselections.map(se => se.studentId)).size;
       return {
-        ...domain,
-        selections: domainSelections.length,
+        ...track,
+        selections: trackselections.length,
         students: uniqueStudents
       };
     });
@@ -45,28 +45,28 @@ const AdminAnalytics: React.FC = () => {
     // Student engagement
     const studentEngagement = students.map((student: any) => {
       const studentElectivesData = studentElectives.filter(se => se.studentId === student.id);
-      const domainSpread = new Set(studentElectivesData.map(se => se.domain)).size;
+      const trackspread = new Set(studentElectivesData.map(se => se.track)).size;
       return {
         ...student,
         totalElectives: studentElectivesData.length,
-        domainSpread
+        trackspread
       };
     });
 
     const avgElectivesPerStudent = studentEngagement.reduce((sum, s) => sum + s.totalElectives, 0) / students.length;
-    const avgDomainSpread = studentEngagement.reduce((sum, s) => sum + s.domainSpread, 0) / students.length;
+    const avgtrackspread = studentEngagement.reduce((sum, s) => sum + s.trackspread, 0) / students.length;
 
     return {
-      domainStats,
+      trackstats,
       semesterStats,
       electivePopularity,
       studentEngagement,
       avgElectivesPerStudent: avgElectivesPerStudent || 0,
-      avgDomainSpread: avgDomainSpread || 0,
+      avgtrackspread: avgtrackspread || 0,
       totalSelections: studentElectives.length,
       activeStudents: new Set(studentElectives.map(se => se.studentId)).size
     };
-  }, [electives, domains, studentElectives, students]);
+  }, [electives, tracks, studentElectives, students]);
 
   const handleExportAnalytics = () => {
     const reportData = {
@@ -77,7 +77,7 @@ const AdminAnalytics: React.FC = () => {
         totalSelections: analytics.totalSelections,
         activeStudents: analytics.activeStudents
       },
-      domainStats: analytics.domainStats,
+      trackstats: analytics.trackstats,
       semesterStats: analytics.semesterStats,
       popularElectives: analytics.electivePopularity.slice(0, 10)
     };
@@ -150,8 +150,8 @@ const AdminAnalytics: React.FC = () => {
           <div className="flex items-center">
             <Award className="w-8 h-8 text-orange-600" />
             <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{analytics.avgDomainSpread.toFixed(1)}</p>
-              <p className="text-gray-600">Avg Domain Spread</p>
+              <p className="text-2xl font-bold text-gray-900">{analytics.avgtrackspread.toFixed(1)}</p>
+              <p className="text-gray-600">Avg track Spread</p>
               <p className="text-xs text-gray-500">diversification</p>
             </div>
           </div>
@@ -159,29 +159,29 @@ const AdminAnalytics: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Domain Distribution */}
+        {/* track Distribution */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Domain Distribution</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">track Distribution</h2>
           <div className="space-y-4">
-            {analytics.domainStats.map(domain => {
-              const maxSelections = Math.max(...analytics.domainStats.map(d => d.selections));
-              const percentage = maxSelections > 0 ? (domain.selections / maxSelections) * 100 : 0;
+            {analytics.trackstats.map(track => {
+              const maxSelections = Math.max(...analytics.trackstats.map(d => d.selections));
+              const percentage = maxSelections > 0 ? (track.selections / maxSelections) * 100 : 0;
               
               return (
-                <div key={domain.id} className="space-y-2">
+                <div key={track.id} className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900">{domain.name}</span>
-                    <span className="text-sm text-gray-600">{domain.selections} selections</span>
+                    <span className="font-medium text-gray-900">{track.name}</span>
+                    <span className="text-sm text-gray-600">{track.selections} selections</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full ${domain.color}`}
+                      className={`h-2 rounded-full ${track.color}`}
                       style={{ width: `${Math.max(5, percentage)}%` }}
                     ></div>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500">
-                    <span>{domain.students} students</span>
-                    <span>{((domain.selections / analytics.totalSelections) * 100).toFixed(1)}%</span>
+                    <span>{track.students} students</span>
+                    <span>{((track.selections / analytics.totalSelections) * 100).toFixed(1)}%</span>
                   </div>
                 </div>
               );
@@ -231,7 +231,7 @@ const AdminAnalytics: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900">{elective.name}</h3>
-                  <p className="text-sm text-gray-600">{elective.code} • {elective.domain}</p>
+                  <p className="text-sm text-gray-600">{elective.code} • {elective.track}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-gray-900">{elective.selections}</p>
@@ -261,11 +261,11 @@ const AdminAnalytics: React.FC = () => {
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-green-900">Average Domain Spread</h3>
-                  <p className="text-sm text-green-700">Cross-domain exploration</p>
+                  <h3 className="font-medium text-green-900">Average track Spread</h3>
+                  <p className="text-sm text-green-700">Cross-track exploration</p>
                 </div>
                 <div className="text-2xl font-bold text-green-900">
-                  {analytics.avgDomainSpread.toFixed(1)}
+                  {analytics.avgtrackspread.toFixed(1)}
                 </div>
               </div>
             </div>
@@ -300,31 +300,31 @@ const AdminAnalytics: React.FC = () => {
 
       {/* Detailed Analytics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        {analytics.domainStats.map(domain => (
-          <div key={domain.id} className="bg-white p-6 rounded-lg shadow-sm border">
+        {analytics.trackstats.map(track => (
+          <div key={track.id} className="bg-white p-6 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">{domain.name}</h3>
-              <div className={`w-4 h-4 rounded-full ${domain.color}`}></div>
+              <h3 className="font-semibold text-gray-900">{track.name}</h3>
+              <div className={`w-4 h-4 rounded-full ${track.color}`}></div>
             </div>
             
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Selections:</span>
-                <span className="font-medium text-gray-900">{domain.selections}</span>
+                <span className="font-medium text-gray-900">{track.selections}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Unique Students:</span>
-                <span className="font-medium text-gray-900">{domain.students}</span>
+                <span className="font-medium text-gray-900">{track.students}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Market Share:</span>
                 <span className="font-medium text-gray-900">
-                  {((domain.selections / analytics.totalSelections) * 100).toFixed(1)}%
+                  {((track.selections / analytics.totalSelections) * 100).toFixed(1)}%
                 </span>
               </div>
             </div>
             
-            <p className="text-sm text-gray-600 mt-4">{domain.description}</p>
+            <p className="text-sm text-gray-600 mt-4">{track.description}</p>
           </div>
         ))}
       </div>
@@ -335,10 +335,10 @@ const AdminAnalytics: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <TrendingUp className="w-8 h-8 text-blue-600 mb-3" />
-            <h3 className="font-medium text-blue-900 mb-2">Most Popular Domain</h3>
+            <h3 className="font-medium text-blue-900 mb-2">Most Popular track</h3>
             <p className="text-sm text-blue-800">
-              {analytics.domainStats[0]?.name} leads with {analytics.domainStats[0]?.selections} selections
-              from {analytics.domainStats[0]?.students} students.
+              {analytics.trackstats[0]?.name} leads with {analytics.trackstats[0]?.selections} selections
+              from {analytics.trackstats[0]?.students} students.
             </p>
           </div>
 

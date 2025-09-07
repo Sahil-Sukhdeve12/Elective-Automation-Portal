@@ -5,7 +5,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { Plus, Edit, Trash2, BookOpen, X, Download, FileText } from 'lucide-react';
 
 const AdminElectives: React.FC = () => {
-  const { electives, domains, addElective, updateElective, deleteElective, exportDataAsExcel, exportDataAsPDF } = useData();
+  const { electives, tracks, addElective, updateElective, deleteElective, exportDataAsExcel, exportDataAsPDF } = useData();
   const { addNotification } = useNotifications();
   
   const [showModal, setShowModal] = useState(false);
@@ -15,7 +15,7 @@ const AdminElectives: React.FC = () => {
     name: '',
     code: '',
     semester: 5,
-    domain: '',
+    track: '',
     description: '',
     credits: 3,
     prerequisites: [] as string[],
@@ -47,7 +47,7 @@ const AdminElectives: React.FC = () => {
         name: elective.name,
         code: elective.code,
         semester: elective.semester,
-        domain: elective.domain,
+        track: elective.track,
         description: elective.description,
         credits: elective.credits,
         prerequisites: elective.prerequisites || [],
@@ -64,7 +64,7 @@ const AdminElectives: React.FC = () => {
         name: '',
         code: '',
         semester: 5,
-        domain: '',
+        track: '',
         description: '',
         credits: 3,
         prerequisites: [],
@@ -195,9 +195,9 @@ const AdminElectives: React.FC = () => {
     }
   };
 
-  const getDomainColor = (domainName: string) => {
-    const domain = domains.find(d => d.name === domainName);
-    return domain?.color || 'bg-gray-500';
+  const gettrackColor = (trackName: string) => {
+    const track = tracks.find(d => d.name === trackName);
+    return track?.color || 'bg-gray-500';
   };
 
   const ElectiveCard = ({ elective }: { elective: Elective }) => (
@@ -207,8 +207,8 @@ const AdminElectives: React.FC = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{elective.name}</h3>
           <p className="text-sm text-gray-600">{elective.code} • Semester {elective.semester}</p>
         </div>
-        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getDomainColor(elective.domain)}`}>
-          {elective.domain}
+        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${gettrackColor(elective.track)}`}>
+          {elective.track}
         </span>
       </div>
 
@@ -408,19 +408,19 @@ const AdminElectives: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Domain *
+                    track *
                   </label>
                   <select
-                    name="domain"
-                    value={formData.domain}
+                    name="track"
+                    value={formData.track}
                     onChange={handleChange}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">Select Domain</option>
-                    {domains.map(domain => (
-                      <option key={domain.id} value={domain.name}>
-                        {domain.name}
+                    <option value="">Select track</option>
+                    {tracks.map(track => (
+                      <option key={track.id} value={track.name}>
+                        {track.name}
                       </option>
                     ))}
                   </select>

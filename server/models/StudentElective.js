@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const studentElectiveSchema = new mongoose.Schema({
   student: {
@@ -17,7 +17,7 @@ const studentElectiveSchema = new mongoose.Schema({
     min: 1,
     max: 8
   },
-  domain: {
+  track: {
     type: String,
     required: true
   },
@@ -55,4 +55,4 @@ studentElectiveSchema.index({ student: 1, elective: 1 }, { unique: true });
 studentElectiveSchema.index({ student: 1, semester: 1 });
 studentElectiveSchema.index({ elective: 1 });
 
-module.exports = mongoose.model('StudentElective', studentElectiveSchema);
+export default mongoose.model('StudentElective', studentElectiveSchema);

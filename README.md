@@ -163,7 +163,7 @@ For initial setup, you can create an admin account through the registration page
   name: String,
   code: String (unique),
   semester: Number,
-  domain: String,
+  track: String,
   description: String,
   prerequisites: [ObjectId],
   credits: Number,
@@ -184,7 +184,7 @@ For initial setup, you can create an admin account through the registration page
   student: ObjectId,
   elective: ObjectId,
   semester: Number,
-  domain: String,
+  track: String,
   status: 'selected' | 'completed' | 'dropped',
   grade: String,
   feedback: {
@@ -201,7 +201,7 @@ For initial setup, you can create an admin account through the registration page
 
 ### Smart Elective Recommendations
 The system provides personalized recommendations based on:
-- Student's interests and domain preferences
+- Student's interests and track preferences
 - Career goals alignment
 - Learning difficulty preferences
 - Previous elective completion patterns

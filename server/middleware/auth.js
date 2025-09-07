@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 // Middleware to authenticate user
 const auth = async (req, res, next) => {
@@ -42,4 +42,4 @@ const isStudent = (req, res, next) => {
   }
 };
 
-module.exports = { auth, isAdmin, isStudent };
+export { auth, isAdmin, isStudent };

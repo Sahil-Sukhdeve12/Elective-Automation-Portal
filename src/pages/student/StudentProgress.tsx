@@ -5,32 +5,33 @@ import { BookOpen, Award, TrendingUp, Star, Target, Zap, ArrowRight, Clock } fro
 
 const StudentProgress: React.FC = () => {
   const { user } = useAuth();
-  const { electives, domains, getStudentElectives } = useData();
+  const { electives, tracks, getStudentElectives, getTracksByCategory, getTracksByDepartment } = useData();
 
   if (!user || user.role !== 'student') return null;
 
   const studentElectives = getStudentElectives(user.id);
   
-  // Categorize electives by electiveCategory
-  const electiveCategories = ['Humanities', 'Departmental', 'Open Elective'] as const;
+  // Categorize electives by category
+  const electiveCategories = ['Departmental', 'Open', 'Humanities'] as const;
   
-  // Domain expertise by category
-  const domainExpertiseByCategory = electiveCategories.map(category => {
-    const categoryElectives = electives.filter(e => e.electiveCategory === category);
+  // Track expertise by category
+  const trackExpertiseByCategory = electiveCategories.map(category => {
+    const categoryTracks = getTracksByCategory(category);
+    const categoryElectives = electives.filter(e => e.category === category);
     const studentCategoryElectives = studentElectives.filter(se => {
       const elective = electives.find(e => e.id === se.electiveId);
-      return elective?.electiveCategory === category;
+      return elective?.category === category;
     });
     
-    const domainStats = domains.map(domain => {
-      const domainCategoryElectives = categoryElectives.filter(e => e.domain === domain.name);
-      const studentDomainElectives = studentCategoryElectives.filter(se => se.domain === domain.name);
-      const totalAvailable = domainCategoryElectives.length;
-      const completed = studentDomainElectives.length;
+    const trackStats = categoryTracks.map(track => {
+      const trackCategoryElectives = categoryElectives.filter(e => e.track === track.name);
+      const studentTrackElectives = studentCategoryElectives.filter(se => se.track === track.name);
+      const totalAvailable = trackCategoryElectives.length;
+      const completed = studentTrackElectives.length;
       const percentage = totalAvailable > 0 ? (completed / totalAvailable) * 100 : 0;
       
       return {
-        ...domain,
+        ...track,
         completed,
         totalAvailable,
         percentage: Math.round(percentage),
@@ -40,14 +41,14 @@ const StudentProgress: React.FC = () => {
 
     return {
       category,
-      domainStats,
+      trackStats,
       totalCompleted: studentCategoryElectives.length,
       totalAvailable: categoryElectives.length
     };
   });
   
-  // Calculate domains explored count
-  const domainsExplored = new Set(studentElectives.map(se => se.domain)).size;
+  // Calculate tracks explored count
+  const tracksExplored = new Set(studentElectives.map(se => se.track)).size;
 
   const totalElectivesCompleted = studentElectives.length;
   const totalCredits = studentElectives.reduce((sum, se) => {
@@ -66,14 +67,15 @@ const StudentProgress: React.FC = () => {
   const currentSemester = user.semester || 5;
   const nextSemester = currentSemester + 1;
   
-  // Get current track (most common domain in completed electives)
-  const trackAnalysis = domains.map(domain => ({
-    domain: domain.name,
-    count: studentElectives.filter(se => se.domain === domain.name).length,
-    color: domain.color
+  // Get current track (most common track in completed electives)
+  const trackAnalysis = tracks.map(track => ({
+    track: track.name,
+    count: studentElectives.filter(se => se.track === track.name).length,
+    color: track.color
   })).sort((a, b) => b.count - a.count);
   
-  const currentTrack = trackAnalysis[0]?.domain || '';
+  const departmenttracks = getTracksByDepartment(user.department || '');
+  const currentTrack = trackAnalysis[0]?.track || departmenttracks[0]?.name || '';
   
   // Recommend electives for next semester based on current track
   const nextSemesterElectives = electives.filter(e => 
@@ -81,8 +83,7 @@ const StudentProgress: React.FC = () => {
     !studentElectives.some(se => se.electiveId === e.id)
   );
   
-  const recommendedElectives = nextSemesterElectives.filter(e => e.domain === currentTrack);
-  const otherElectives = nextSemesterElectives.filter(e => e.domain !== currentTrack);
+  const recommendedElectives = nextSemesterElectives.filter(e => e.track === currentTrack);
 
   // Get expertise level icon and color
   const getExpertiseIcon = (level: string) => {
@@ -103,9 +104,9 @@ const StudentProgress: React.FC = () => {
     }
   };
 
-  const getDomainColor = (domain: string) => {
-    const domainObj = domains.find(d => d.name === domain);
-    return domainObj?.color || 'bg-gray-500';
+  const gettrackColor = (track: string) => {
+    const trackObj = tracks.find(d => d.name === track);
+    return trackObj?.color || 'bg-gray-500';
   };
 
   return (
@@ -113,7 +114,7 @@ const StudentProgress: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Academic Progress</h1>
         <p className="text-gray-600 mt-2">
-          Track your elective journey and domain expertise across all categories
+          Track your elective journey and track expertise across all categories
         </p>
       </div>
 
@@ -144,45 +145,45 @@ const StudentProgress: React.FC = () => {
             <TrendingUp className="w-8 h-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">
-                {domainsExplored}
+                {tracksExplored}
               </p>
-              <p className="text-gray-600">Domains Explored</p>
+              <p className="text-gray-600">tracks Explored</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Domain Expertise by Category */}
+      {/* track Expertise by Category */}
       <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-6">Domain Expertise by Category</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-6">track Expertise by Category</h2>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {domainExpertiseByCategory.map(({ category, domainStats, totalCompleted, totalAvailable }) => (
+          {trackExpertiseByCategory.map(({ category, trackStats, totalCompleted, totalAvailable }) => (
             <div key={category} className="bg-white p-6 rounded-lg shadow-sm border">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{category} Electives</h3>
                 <span className="text-sm text-gray-600">
                   {totalCompleted}/{totalAvailable} completed
                 </span>
               </div>
               
               <div className="space-y-3">
-                {domainStats.map(domain => (
-                  <div key={domain.id} className="flex items-center justify-between">
+                {trackStats.map(track => (
+                  <div key={track.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${domain.color}`}></div>
-                      <span className="text-sm font-medium text-gray-900">{domain.name}</span>
+                      <div className={`w-3 h-3 rounded-full`} style={{backgroundColor: track.color}}></div>
+                      <span className="text-sm font-medium text-gray-900">{track.name}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getExpertiseColor(domain.level)}`}>
-                        {getExpertiseIcon(domain.level)}
-                        <span className="ml-1">{domain.level}</span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getExpertiseColor(track.level)}`}>
+                        {getExpertiseIcon(track.level)}
+                        <span className="ml-1">{track.level}</span>
                       </span>
-                      <span className="text-xs text-gray-500">{domain.completed}/{domain.totalAvailable}</span>
+                      <span className="text-xs text-gray-500">{track.completed}/{track.totalAvailable}</span>
                     </div>
                   </div>
                 ))}
-                {domainStats.length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">No domains available in this category</p>
+                {trackStats.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">No tracks available in this category</p>
                 )}
               </div>
             </div>
@@ -227,29 +228,8 @@ const StudentProgress: React.FC = () => {
                     <p className="text-sm text-gray-600 mb-2">{elective.code} • {elective.credits} Credits</p>
                     <p className="text-sm text-gray-700 mb-3">{elective.description}</p>
                     <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getDomainColor(elective.domain)}`}>
-                        {elective.domain}
-                      </span>
-                      <span className="text-xs text-gray-500">{elective.electiveCategory}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {otherElectives.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Other Available Electives</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {otherElectives.map(elective => (
-                  <div key={elective.id} className="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">{elective.name}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{elective.code} • {elective.credits} Credits</p>
-                    <p className="text-sm text-gray-700 mb-3">{elective.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getDomainColor(elective.domain)}`}>
-                        {elective.domain}
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${gettrackColor(elective.track)}`}>
+                        {elective.track}
                       </span>
                       <span className="text-xs text-gray-500">{elective.electiveCategory}</span>
                     </div>
@@ -276,13 +256,13 @@ const StudentProgress: React.FC = () => {
                 <div className="flex-1">
                   <h4 className="font-semibold text-gray-900">{se.elective?.name}</h4>
                   <p className="text-sm text-gray-600">
-                    {se.elective?.code} • Semester {se.semester} • {se.domain}
+                    {se.elective?.code} • Semester {se.semester} • {se.track}
                   </p>
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-medium text-gray-900">{se.elective?.credits} Credits</span>
                   <p className="text-xs text-gray-500">
-                    {new Date(se.completedAt).toLocaleDateString()}
+                    {new Date(se.dateSelected).toLocaleDateString()}
                   </p>
                 </div>
               </div>

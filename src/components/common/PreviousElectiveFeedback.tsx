@@ -116,7 +116,7 @@ const PreviousElectiveFeedback: React.FC<PreviousElectiveFeedbackProps> = ({
                   {previousElective.name}
                 </p>
                 <p className="text-blue-700 dark:text-blue-300 text-sm">
-                  {previousElective.code} • {previousElective.domain}
+                  {previousElective.code} • {previousElective.track}
                 </p>
               </div>
               <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${

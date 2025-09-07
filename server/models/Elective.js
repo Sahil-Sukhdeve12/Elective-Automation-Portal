@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const electiveSchema = new mongoose.Schema({
   name: {
@@ -18,7 +18,7 @@ const electiveSchema = new mongoose.Schema({
     min: 1,
     max: 8
   },
-  domain: {
+  track: {
     type: String,
     required: true
   },
@@ -87,7 +87,7 @@ electiveSchema.pre('save', function(next) {
 
 // Index for better query performance
 electiveSchema.index({ semester: 1, department: 1, electiveCategory: 1 });
-electiveSchema.index({ domain: 1 });
+electiveSchema.index({ track: 1 });
 electiveSchema.index({ code: 1 });
 
-module.exports = mongoose.model('Elective', electiveSchema);
+export default mongoose.model('Elective', electiveSchema);

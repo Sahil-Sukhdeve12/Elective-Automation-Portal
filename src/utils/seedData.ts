@@ -47,21 +47,21 @@ export const seedInitialData = () => {
         studentId: 'student1',
         electiveId: '1',
         semester: 5,
-        domain: 'Artificial Intelligence',
+        track: 'Artificial Intelligence',
         completedAt: new Date('2024-06-15')
       },
       {
         studentId: 'student1',
         electiveId: '4',
         semester: 6,
-        domain: 'Cybersecurity',
+        track: 'Cybersecurity',
         completedAt: new Date('2024-12-15')
       },
       {
         studentId: 'student2',
         electiveId: '7',
         semester: 5,
-        domain: 'Data Science',
+        track: 'Data Science',
         completedAt: new Date('2024-06-15')
       }
     ];

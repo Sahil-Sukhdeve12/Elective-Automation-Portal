@@ -1,27 +1,30 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { BookOpen, TrendingUp, Clock, Target, ArrowRight } from 'lucide-react';
+import { BookOpen, TrendingUp, Clock, Target, ArrowRight, Bell, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ProgressBar from '../../components/common/ProgressBar';
 
 const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { electives, domains, getStudentElectives, getRecommendations } = useData();
+  const { electives, tracks, getStudentElectives, getRecommendations, getActiveAlerts } = useData();
 
   if (!user || user.role !== 'student') return null;
 
   const studentElectives = getStudentElectives(user.id);
   const currentSemester = user.semester || 5;
-  const recommendations = getRecommendations(user.id, currentSemester);
+  const recommendations = getRecommendations(user.id);
+  
+  // Get alerts relevant to the student
+  const relevantAlerts = getActiveAlerts(user.department, user.semester);
 
-  const domainProgress = domains.map(domain => {
-    const domainElectives = studentElectives.filter(se => se.domain === domain.name);
-    const totalInDomain = electives.filter(e => e.domain === domain.name).length;
+  const trackProgress = tracks.map(track => {
+    const trackElectives = studentElectives.filter(se => se.track === track.name);
+    const totalIntrack = electives.filter(e => e.track === track.name).length;
     return {
-      ...domain,
-      completed: domainElectives.length,
-      total: totalInDomain
+      ...track,
+      completed: trackElectives.length,
+      total: totalIntrack
     };
   });
 
@@ -35,6 +38,37 @@ const StudentDashboard: React.FC = () => {
           {user.department} • Semester {user.semester}
         </p>
       </div>
+
+      {/* Alert Notifications */}
+      {relevantAlerts.length > 0 && (
+        <div className="mb-8 space-y-4">
+          {relevantAlerts.map(alert => (
+            <div 
+              key={alert.id} 
+              className={`p-4 rounded-lg border-l-4 ${
+                alert.type === 'deadline' ? 'bg-red-50 border-red-500' :
+                alert.type === 'elective_reminder' ? 'bg-blue-50 border-blue-500' :
+                'bg-yellow-50 border-yellow-500'
+              }`}
+            >
+              <div className="flex items-start">
+                <Bell className={`w-5 h-5 mt-0.5 mr-3 ${
+                  alert.type === 'deadline' ? 'text-red-600' :
+                  alert.type === 'elective_reminder' ? 'text-blue-600' :
+                  'text-yellow-600'
+                }`} />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">{alert.title}</h3>
+                  <p className="text-gray-700 mt-1">{alert.message}</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    {new Date(alert.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -62,9 +96,9 @@ const StudentDashboard: React.FC = () => {
             <TrendingUp className="w-8 h-8 text-purple-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">
-                {domainProgress.filter(d => d.completed > 0).length}
+                {trackProgress.filter(d => d.completed > 0).length}
               </p>
-              <p className="text-gray-600">Domains Explored</p>
+              <p className="text-gray-600">tracks Explored</p>
             </div>
           </div>
         </div>
@@ -81,19 +115,19 @@ const StudentDashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Domain Progress */}
+        {/* track Progress */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Domain Progress</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">track Progress</h2>
           <div className="space-y-6">
-            {domainProgress.map(domain => (
-              <div key={domain.id}>
+            {trackProgress.map(track => (
+              <div key={track.id}>
                 <ProgressBar
-                  progress={domain.completed}
-                  total={domain.total}
-                  label={domain.name}
-                  color={domain.color}
+                  progress={track.completed}
+                  total={track.total}
+                  label={track.name}
+                  color={track.color}
                 />
-                <p className="text-sm text-gray-600 mt-1">{domain.description}</p>
+                <p className="text-sm text-gray-600 mt-1">{track.description}</p>
               </div>
             ))}
           </div>
@@ -116,7 +150,7 @@ const StudentDashboard: React.FC = () => {
               {recommendations.slice(0, 3).map(elective => (
                 <div key={elective.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <h3 className="font-semibold text-gray-900">{elective.name}</h3>
-                  <p className="text-sm text-gray-600">{elective.code} • {elective.domain}</p>
+                  <p className="text-sm text-gray-600">{elective.code} • {elective.track}</p>
                   <p className="text-sm text-gray-700 mt-2">{elective.description}</p>
                 </div>
               ))}

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData, AlertNotification } from '../../contexts/DataContext';
-import { Users, BookOpen, BarChart3, Star, Building2, Trash2, Bell, FileText } from 'lucide-react';
-import AdminSyllabus from './AdminSyllabus';
+import { Users, BookOpen, BarChart3, Star, Building2, Plus, Trash2, Bell } from 'lucide-react';
 
 // Alert Management Component
 interface AlertManagementProps {
@@ -21,64 +20,34 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
   const [newAlert, setNewAlert] = useState({
     title: '',
     message: '',
-    type: 'general' as 'elective_reminder' | 'deadline' | 'general',
-    targetDepartment: '',
-    targetSemester: '',
-    createdBy: 'Admin',
-    sendEmail: false
+    type: 'info' as 'info' | 'warning' | 'error' | 'success',
+    department: '',
+    semester: '',
+    expiresAt: '',
+    priority: 'medium' as 'low' | 'medium' | 'high'
   });
-
-  const sendEmailNotification = (alertData: typeof newAlert, targetUsers: Array<{email: string, name: string}>) => {
-    // Mock email sending function
-    console.log('Sending email notification:', {
-      subject: alertData.title,
-      message: alertData.message,
-      recipients: targetUsers.map(user => user.email),
-      count: targetUsers.length
-    });
-    
-    // In a real application, this would make an API call to an email service
-    alert(`Mock Email Sent!\n\nSubject: ${alertData.title}\nMessage: ${alertData.message}\nRecipients: ${targetUsers.length} users\n\n(Check console for details)`);
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Create the alert
     createAlert({
       title: newAlert.title,
       message: newAlert.message,
       type: newAlert.type,
-      targetDepartment: newAlert.targetDepartment || undefined,
-      targetSemester: newAlert.targetSemester ? parseInt(newAlert.targetSemester) : undefined,
-      createdBy: newAlert.createdBy
+      department: newAlert.department || undefined,
+      semester: newAlert.semester ? parseInt(newAlert.semester) : undefined,
+      expiresAt: newAlert.expiresAt ? new Date(newAlert.expiresAt) : undefined,
+      priority: newAlert.priority,
+      isActive: true
     });
-
-    // Send email if requested
-    if (newAlert.sendEmail) {
-      // Get target users based on department and semester filters
-      const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      let targetUsers = allUsers.filter((user: {role: string, department?: string, semester?: number, email: string, name: string}) => user.role === 'student');
-      
-      if (newAlert.targetDepartment) {
-        targetUsers = targetUsers.filter((user: typeof targetUsers[0]) => user.department === newAlert.targetDepartment);
-      }
-      
-      if (newAlert.targetSemester) {
-        targetUsers = targetUsers.filter((user: typeof targetUsers[0]) => user.semester === parseInt(newAlert.targetSemester));
-      }
-      
-      sendEmailNotification(newAlert, targetUsers);
-    }
     
     setNewAlert({
       title: '',
       message: '',
-      type: 'general',
-      targetDepartment: '',
-      targetSemester: '',
-      createdBy: 'Admin',
-      sendEmail: false
+      type: 'info',
+      department: '',
+      semester: '',
+      expiresAt: '',
+      priority: 'medium'
     });
   };
 
@@ -110,12 +79,13 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
               </label>
               <select
                 value={newAlert.type}
-                onChange={(e) => setNewAlert({ ...newAlert, type: e.target.value as 'elective_reminder' | 'deadline' | 'general' })}
+                onChange={(e) => setNewAlert({ ...newAlert, type: e.target.value as any })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="general">General</option>
-                <option value="elective_reminder">Elective Reminder</option>
-                <option value="deadline">Deadline</option>
+                <option value="info">Info</option>
+                <option value="warning">Warning</option>
+                <option value="error">Error</option>
+                <option value="success">Success</option>
               </select>
             </div>
           </div>
@@ -134,14 +104,14 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Department (Optional)
               </label>
               <select
-                value={newAlert.targetDepartment}
-                onChange={(e) => setNewAlert({ ...newAlert, targetDepartment: e.target.value })}
+                value={newAlert.department}
+                onChange={(e) => setNewAlert({ ...newAlert, department: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Departments</option>
@@ -156,8 +126,8 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
                 Semester (Optional)
               </label>
               <select
-                value={newAlert.targetSemester}
-                onChange={(e) => setNewAlert({ ...newAlert, targetSemester: e.target.value })}
+                value={newAlert.semester}
+                onChange={(e) => setNewAlert({ ...newAlert, semester: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Semesters</option>
@@ -166,19 +136,33 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
                 ))}
               </select>
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Priority
+              </label>
+              <select
+                value={newAlert.priority}
+                onChange={(e) => setNewAlert({ ...newAlert, priority: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="sendEmail"
-              checked={newAlert.sendEmail}
-              onChange={(e) => setNewAlert({ ...newAlert, sendEmail: e.target.checked })}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="sendEmail" className="text-sm text-gray-700">
-              Send email notification to targeted students
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Expires At (Optional)
             </label>
+            <input
+              type="datetime-local"
+              value={newAlert.expiresAt}
+              onChange={(e) => setNewAlert({ ...newAlert, expiresAt: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
 
           <button
@@ -202,18 +186,27 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="font-medium text-gray-900">{alert.title}</h4>
                     <span className={`px-2 py-1 text-xs rounded-full ${
-                      alert.type === 'deadline' ? 'bg-red-100 text-red-800' :
-                      alert.type === 'elective_reminder' ? 'bg-yellow-100 text-yellow-800' :
+                      alert.type === 'error' ? 'bg-red-100 text-red-800' :
+                      alert.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                      alert.type === 'success' ? 'bg-green-100 text-green-800' :
                       'bg-blue-100 text-blue-800'
                     }`}>
                       {alert.type}
                     </span>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      alert.priority === 'high' ? 'bg-red-100 text-red-800' :
+                      alert.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {alert.priority}
+                    </span>
                   </div>
                   <p className="text-gray-700 mb-2">{alert.message}</p>
                   <div className="text-sm text-gray-500">
-                    {alert.targetDepartment && <span>Department: {alert.targetDepartment} • </span>}
-                    {alert.targetSemester && <span>Semester: {alert.targetSemester} • </span>}
-                    Created: {alert.createdAt.toLocaleDateString()} • By: {alert.createdBy}
+                    {alert.department && <span>Department: {alert.department} • </span>}
+                    {alert.semester && <span>Semester: {alert.semester} • </span>}
+                    Created: {alert.createdAt.toLocaleDateString()}
+                    {alert.expiresAt && <span> • Expires: {alert.expiresAt.toLocaleDateString()}</span>}
                   </div>
                 </div>
                 <button
@@ -242,7 +235,7 @@ const AdminDashboard: React.FC = () => {
     getActiveAlerts,
     deleteAlert
   } = useData();
-  const [selectedView, setSelectedView] = useState<'overview' | 'departments' | 'alerts' | 'syllabus'>('overview');
+  const [selectedView, setSelectedView] = useState<'overview' | 'departments' | 'alerts'>('overview');
 
   if (!user || user.role !== 'admin') return null;
 
@@ -268,7 +261,7 @@ const AdminDashboard: React.FC = () => {
 
     // Get tracks with their selection counts
     const tracksWithSelections = deptTracks.map(track => {
-      const selections = studentElectives.filter(se => se.track === track.name).length;
+      const selections = studentElectives.filter(se => se.trackId === track.id).length;
       return { ...track, selections };
     }).sort((a, b) => b.selections - a.selections);
 
@@ -291,7 +284,7 @@ const AdminDashboard: React.FC = () => {
     const categoryTracks = tracks.filter(track => track.category === category);
     
     const tracksWithSelections = categoryTracks.map(track => {
-      const selections = studentElectives.filter(se => se.track === track.name).length;
+      const selections = studentElectives.filter(se => se.trackId === track.id).length;
       return { ...track, selections };
     }).sort((a, b) => b.selections - a.selections);
 
@@ -334,12 +327,11 @@ const AdminDashboard: React.FC = () => {
             {[
               { id: 'overview', label: 'Overview', icon: BarChart3 },
               { id: 'departments', label: 'Departments', icon: Building2 },
-              { id: 'alerts', label: 'Alert System', icon: Bell },
-              { id: 'syllabus', label: 'Syllabus Management', icon: FileText }
+              { id: 'alerts', label: 'Alert System', icon: Bell }
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setSelectedView(tab.id as 'overview' | 'departments' | 'alerts' | 'syllabus')}
+                onClick={() => setSelectedView(tab.id as 'overview' | 'departments' | 'alerts')}
                 className={`group inline-flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
                   selectedView === tab.id
                     ? 'border-blue-500 text-blue-600'
@@ -507,13 +499,6 @@ const AdminDashboard: React.FC = () => {
             deleteAlert={deleteAlert}
             departments={departments}
           />
-        </div>
-      )}
-
-      {/* Syllabus Management Tab */}
-      {selectedView === 'syllabus' && (
-        <div className="space-y-6">
-          <AdminSyllabus />
         </div>
       )}
     </div>

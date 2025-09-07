@@ -1,22 +1,22 @@
-const express = require('express');
-const Elective = require('../models/Elective');
-const StudentElective = require('../models/StudentElective');
-const ElectiveFeedback = require('../models/ElectiveFeedback');
-const { auth, isAdmin, isStudent } = require('../middleware/auth');
+import express from 'express';
+import Elective from '../models/Elective.js';
+import StudentElective from '../models/StudentElective.js';
+import ElectiveFeedback from '../models/ElectiveFeedback.js';
+import { auth, isAdmin, isStudent } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Get all electives (public)
 router.get('/', async (req, res) => {
   try {
-    const { category, department, semester, domain } = req.query;
+    const { category, department, semester, track } = req.query;
     
     let filter = { isActive: true };
     
     if (category) filter.electiveCategory = category;
     if (department) filter.department = department;
     if (semester) filter.semester = parseInt(semester);
-    if (domain) filter.domain = domain;
+    if (track) filter.track = track;
 
     const electives = await Elective.find(filter)
       .populate('prerequisites', 'name code')
@@ -183,7 +183,7 @@ router.post('/:id/select', auth, isStudent, async (req, res) => {
       student: req.user.id,
       elective: electiveId,
       semester: semester || req.user.semester,
-      domain: elective.domain
+      track: elective.track
     });
 
     await studentElective.save();
@@ -202,7 +202,7 @@ router.post('/:id/select', auth, isStudent, async (req, res) => {
 router.get('/student/my-electives', auth, isStudent, async (req, res) => {
   try {
     const studentElectives = await StudentElective.find({ student: req.user.id })
-      .populate('elective', 'name code semester domain description credits category electiveCategory')
+      .populate('elective', 'name code semester track description credits category electiveCategory')
       .sort({ semester: 1, selectedAt: 1 });
 
     res.json(studentElectives);
@@ -271,7 +271,7 @@ router.post('/recommendations', auth, isStudent, async (req, res) => {
       let score = 0;
       
       // Interest matching
-      if (interests.includes(elective.domain)) score += 3;
+      if (interests.includes(elective.track)) score += 3;
       
       // Career goal matching
       if (elective.description.toLowerCase().includes(careerGoals.toLowerCase())) score += 2;
@@ -295,4 +295,4 @@ router.post('/recommendations', auth, isStudent, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

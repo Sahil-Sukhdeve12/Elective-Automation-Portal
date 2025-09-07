@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { User, Mail, Phone, Save, Building } from 'lucide-react';
+import { User, Mail, Phone, Save, Building, Hash, CreditCard } from 'lucide-react';
 
 const StudentProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
+  const { getAvailableDepartments, getAvailableSemesters } = useData();
   const { addNotification } = useNotifications();
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
+    rollNo: user?.rollNo || '',
+    rollNumber: user?.rollNumber || '',
     mobile: '', // Would be stored in user profile in real app
     department: user?.department || '',
     semester: user?.semester || 5,
@@ -19,14 +23,8 @@ const StudentProfile: React.FC = () => {
   
   if (!user || user.role !== 'student') return null;
 
-  const departments = [
-    'Computer Science & Engineering',
-    'Information Technology',
-    'Electronics & Communication',
-    'Mechanical Engineering',
-    'Civil Engineering',
-    'Electrical Engineering'
-  ];
+  const departments = getAvailableDepartments();
+  const availableSemesters = getAvailableSemesters();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -97,6 +95,14 @@ const StudentProfile: React.FC = () => {
                 <span className="font-medium text-gray-900 capitalize">{user.role}</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-gray-600">Registration Number:</span>
+                <span className="font-medium text-gray-900">{user.rollNo}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Roll No:</span>
+                <span className="font-medium text-gray-900">{user.rollNumber}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-gray-600">Department:</span>
                 <span className="font-medium text-gray-900">{user.department}</span>
               </div>
@@ -151,6 +157,44 @@ const StudentProfile: React.FC = () => {
                       value={formData.email}
                       onChange={handleChange}
                       className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="rollNo" className="block text-sm font-medium text-gray-700 mb-1">
+                    Registration Number
+                  </label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <input
+                      id="rollNo"
+                      name="rollNo"
+                      type="text"
+                      required
+                      value={formData.rollNo}
+                      onChange={handleChange}
+                      className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="e.g., 2223CRPFTAIE120"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="rollNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                    Roll No
+                  </label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <input
+                      id="rollNumber"
+                      name="rollNumber"
+                      type="text"
+                      required
+                      value={formData.rollNumber}
+                      onChange={handleChange}
+                      className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="e.g., 120"
                     />
                   </div>
                 </div>
@@ -227,7 +271,7 @@ const StudentProfile: React.FC = () => {
                     onChange={handleChange}
                     className="block w-full px-3 py-3 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   >
-                    {[5, 6, 7, 8].map(sem => (
+                    {availableSemesters.map(sem => (
                       <option key={sem} value={sem}>Semester {sem}</option>
                     ))}
                   </select>

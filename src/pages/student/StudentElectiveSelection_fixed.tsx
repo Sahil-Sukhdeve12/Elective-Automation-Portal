@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData, Elective } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Book, Users, Globe, ArrowRight, Info, Check, BookOpen, Calendar, Clock } from 'lucide-react';
+import { Book, Users, Globe, ArrowRight, Info, Check, BookOpen } from 'lucide-react';
 
 const StudentElectiveSelection: React.FC = () => {
   const { user } = useAuth();
@@ -49,157 +49,81 @@ const StudentElectiveSelection: React.FC = () => {
     return categories;
   }, [selectedElectivesThisSemester, electives]);
 
-  if (!user) return null;
-
-  // Check if user can select from a specific category
-  const canSelectFromCategory = (category: string) => {
-    return !selectedCategories.has(category);
-  };
-
-  // Get available electives for the selected category
-  // Get electives for the selected category and current semester
-  const getElectives = () => {
-    if (!selectedCategory || !user) return [];
-    return getElectivesByCategoryAndDepartment(
-      selectedCategory as 'Departmental' | 'Open' | 'Humanities', 
-      user.department, 
-      electiveSelectionSemester // Filter by current semester
-    );
-  };
-
-  // Get available tracks for the selected category
-  const getAvailableTracks = () => {
-    if (!selectedCategory) return [];
-    if (selectedCategory === 'Departmental') {
-      return getTracksByDepartment(user.department || '');
+  // Category data for display
+  const categoryData = [
+    {
+      id: 'Departmental',
+      title: 'Departmental Electives',
+      description: 'Core electives from your department',
+      icon: Book,
+      color: 'bg-blue-500'
+    },
+    {
+      id: 'Open',
+      title: 'Open Electives',
+      description: 'Choose from any department',
+      icon: Globe,
+      color: 'bg-green-500'
+    },
+    {
+      id: 'Humanities',
+      title: 'Humanities & Social Sciences',
+      description: 'Liberal arts and social sciences',
+      icon: Users,
+      color: 'bg-purple-500'
     }
-    // For other categories, get unique tracks from electives
-    const categoryElectives = getElectives();
-    const uniqueTracks = [...new Set(categoryElectives.map(e => e.track))];
-    return uniqueTracks.map(track => ({ 
-      id: track, 
-      name: track, 
-      description: '', 
-      color: 'bg-gray-500', 
-      suggestedElectives: [], 
-      department: '' 
-    }));
+  ].filter(cat => availableCategories.includes(cat.id));
+
+  // Check if a student can select from a category (max 1 per category, max 3 total)
+  const canSelectFromCategory = (category: string) => {
+    if (selectedCategories.has(category)) return false;
+    if (selectedCategories.size >= 3) return false;
+    return true;
   };
-
-  // Get filtered electives based on selected track
-  const getFilteredElectives = () => {
-    const categoryElectives = getElectives();
-    if (!selectedTrack) return categoryElectives;
-    return categoryElectives.filter(e => e.track === selectedTrack);
-  };
-
-  // Generate category data from admin configuration
-  const categoryData = availableCategories.map(category => {
-    const icons = {
-      'Departmental': Book,
-      'Open': Globe,
-      'Humanities': Users
-    };
-    
-    const colors = {
-      'Departmental': 'bg-blue-500',
-      'Open': 'bg-green-500', 
-      'Humanities': 'bg-purple-500'
-    };
-
-    const hoverColors = {
-      'Departmental': 'hover:bg-blue-600',
-      'Open': 'hover:bg-green-600',
-      'Humanities': 'hover:bg-purple-600'  
-    };
-
-    const descriptions = {
-      'Departmental': 'Advanced courses in your department specialization',
-      'Open': 'Courses from any department to broaden your knowledge',
-      'Humanities': 'Philosophy, communication, economics, and management courses'
-    };
-
-    return {
-      id: category,
-      title: category === 'Open' ? 'Open Elective' : category,
-      description: descriptions[category as keyof typeof descriptions] || `${category} electives`,
-      icon: icons[category as keyof typeof icons] || BookOpen,
-      color: colors[category as keyof typeof colors] || 'bg-gray-500',
-      hoverColor: hoverColors[category as keyof typeof hoverColors] || 'hover:bg-gray-600'
-    };
-  });
 
   const handleCategorySelect = (category: string) => {
-    if (!canSelectFromCategory(category)) {
-      addNotification({
-        type: 'warning',
-        title: 'Category Already Selected',
-        message: `You have already selected an elective from the ${category} category for this semester.`
-      });
-      return;
+    if (canSelectFromCategory(category)) {
+      setSelectedCategory(category);
     }
-    setSelectedCategory(category);
-    setSelectedTrack(''); // Reset track selection
   };
 
-  const handleElectiveSelect = (electiveId: string) => {
-    const elective = electives.find(e => e.id === electiveId);
-    if (!elective) return;
+  // Get available tracks for selected category
+  const getAvailableTracks = () => {
+    if (!selectedCategory || !user) return [];
+    return getTracksByDepartment(user.department);
+  };
 
-    // Check if already selected this category
-    if (!canSelectFromCategory(elective.category)) {
-      addNotification({
-        type: 'warning',
-        title: 'Category Already Selected',
-        message: `You have already selected an elective from the ${elective.category} category for this semester.`
-      });
-      return;
+  // Get filtered electives based on category and track
+  const getFilteredElectives = () => {
+    if (!selectedCategory || !user) return [];
+    let filteredElectives = getElectivesByCategoryAndDepartment(selectedCategory, user.department);
+    
+    if (selectedTrack) {
+      filteredElectives = filteredElectives.filter(e => e.track === selectedTrack);
     }
+    
+    return filteredElectives;
+  };
 
-    // Check if already selected this specific elective
-    if (selectedElectivesThisSemester.some(se => se.electiveId === electiveId)) {
-      addNotification({
-        type: 'warning',
-        title: 'Already Selected',
-        message: 'You have already selected this elective for this semester.'
-      });
-      return;
-    }
-
-    // Check if selection is open (default to true if function not available)
-    const selectionOpen = isElectiveSelectionOpen ? isElectiveSelectionOpen(electiveId) : true;
-    if (!selectionOpen) {
-      addNotification({
-        type: 'error',
-        title: 'Selection Closed',
-        message: 'The deadline for this elective has passed.'
-      });
-      return;
-    }
-
-    // Check availability
-    const availability = isElectiveAvailable(electiveId);
-    if (!availability.available) {
-      addNotification({
-        type: 'error',
-        title: 'Not Available',
-        message: availability.reason || 'This elective is not available.'
-      });
-      return;
-    }
-
+  const handleElectiveSelect = async (electiveId: string) => {
+    if (!user) return;
+    
     try {
-      selectElective(user.id, electiveId, electiveSelectionSemester);
-      addNotification({
-        type: 'success',
-        title: 'Elective Selected',
-        message: `You have successfully selected "${elective.name}" for Semester ${electiveSelectionSemester}!`
-      });
-      
-      // Reset selections to go back to category view
-      setSelectedCategory(null);
-      setSelectedTrack('');
-    } catch {
+      const success = await selectElective(user.id, electiveId, electiveSelectionSemester);
+      if (success) {
+        addNotification({
+          type: 'success',
+          title: 'Elective Selected',
+          message: 'Successfully enrolled in the elective!'
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Selection Failed',
+          message: 'Failed to select elective. Please try again.'
+        });
+      }
+    } catch (error) {
       addNotification({
         type: 'error',
         title: 'Selection Failed',
@@ -339,20 +263,18 @@ const StudentElectiveSelection: React.FC = () => {
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              {categoryData.find(c => c.id === selectedCategory)?.title} Electives
+              {selectedCategory} Electives
             </h1>
-            <p className="text-gray-600 dark:text-gray-300">
-              {categoryData.find(c => c.id === selectedCategory)?.description}
+            <p className="text-gray-600 dark:text-gray-300 mt-1">
+              Choose your elective for Semester {electiveSelectionSemester}
             </p>
           </div>
         </div>
 
-        {/* Track Selection */}
+        {/* Track Filter */}
         {tracks.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Select a Track
-            </h2>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filter by Track</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               <button
                 onClick={() => setSelectedTrack('')}
@@ -444,38 +366,14 @@ const StudentElectiveSelection: React.FC = () => {
                       </span>
                     </div>
                   )}
-
-                  {/* Deadline Display */}
-                  {elective.selectionDeadline && (
-                    <div className="mb-4">
-                      <div className="flex items-center space-x-2">
-                        <Clock className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selection Deadline: </span>
-                        <span className={`text-sm font-medium ${
-                          selectionOpen 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {new Date(elective.selectionDeadline).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                   
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-gray-500 dark:text-gray-400">
                       Semester {elective.semester}
                     </div>
                     {!selectionOpen && (
-                      <div className="flex items-center text-red-600 dark:text-red-400">
-                        <Clock className="w-4 h-4 mr-1" />
-                        <span className="text-xs font-medium">Deadline Passed</span>
+                      <div className="flex items-center text-orange-600 dark:text-orange-400">
+                        <span className="text-xs">Registration Closed</span>
                       </div>
                     )}
                   </div>
@@ -517,35 +415,99 @@ const StudentElectiveSelection: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {selectedElectiveInfo.name} - Details
-                </h3>
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    {selectedElectiveInfo.name}
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    {selectedElectiveInfo.code} • {selectedElectiveInfo.credits} Credits
+                  </p>
+                </div>
                 <button
                   onClick={() => setShowInfoModal(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
-                  <span className="sr-only">Close</span>
                   ✕
                 </button>
               </div>
-              
-              <div className="space-y-2 text-gray-600 dark:text-gray-300">
-                <p><strong>Code:</strong> {selectedElectiveInfo.code}</p>
-                <p><strong>Credits:</strong> {selectedElectiveInfo.credits}</p>
-                <p><strong>Track:</strong> {selectedElectiveInfo.track}</p>
-                <p><strong>Category:</strong> {selectedElectiveInfo.category}</p>
-                <p><strong>Type:</strong> {selectedElectiveInfo.electiveCategory}</p>
-                <p><strong>Description:</strong> {selectedElectiveInfo.description}</p>
-                {selectedElectiveInfo.prerequisites && selectedElectiveInfo.prerequisites.length > 0 && (
-                  <p><strong>Prerequisites:</strong> {selectedElectiveInfo.prerequisites.join(', ')}</p>
-                )}
+
+              {selectedElectiveInfo.image && (
+                <div className="mb-6">
+                  <img 
+                    src={selectedElectiveInfo.image} 
+                    alt={selectedElectiveInfo.name}
+                    className="w-full h-64 object-cover rounded-lg"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = 'https://via.placeholder.com/400x300/6366f1/ffffff?text=' + encodeURIComponent(selectedElectiveInfo.name.substring(0, 2));
+                    }}
+                  />
+                </div>
+              )}
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Course Details</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
+                      <p className="text-gray-600 dark:text-gray-400 mt-1">{selectedElectiveInfo.description}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Department:</span>
+                      <p className="text-gray-600 dark:text-gray-400">{selectedElectiveInfo.department}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Track:</span>
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium text-white ${getTrackColor(selectedElectiveInfo.track)}`}>
+                        {selectedElectiveInfo.track}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Category:</span>
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium text-white ${
+                        selectedElectiveInfo.category === 'Departmental' ? 'bg-blue-500' :
+                        selectedElectiveInfo.category === 'Humanities' ? 'bg-purple-500' : 'bg-green-500'
+                      }`}>
+                        {selectedElectiveInfo.category}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Requirements</h3>
+                  <div className="space-y-3">
+                    {selectedElectiveInfo.prerequisites && selectedElectiveInfo.prerequisites.length > 0 && (
+                      <div>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">Prerequisites:</span>
+                        <ul className="text-gray-600 dark:text-gray-400 mt-1 list-disc list-inside">
+                          {selectedElectiveInfo.prerequisites.map((prereq, index) => (
+                            <li key={index}>{prereq}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {selectedElectiveInfo.futureOpportunities && selectedElectiveInfo.futureOpportunities.length > 0 && (
+                      <div>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">Future Opportunities:</span>
+                        <ul className="text-gray-600 dark:text-gray-400 mt-1 list-disc list-inside">
+                          {selectedElectiveInfo.futureOpportunities.map((opportunity, index) => (
+                            <li key={index}>{opportunity}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              
-              <div className="mt-6 flex justify-end">
+
+              <div className="flex justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setShowInfoModal(false)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors mr-3"
                 >
                   Close
                 </button>

@@ -71,8 +71,8 @@ const ElectiveInfoModal: React.FC<ElectiveInfoModalProps> = ({
                   <p className="text-gray-600 dark:text-gray-300">{elective.semester}</p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">Domain</h4>
-                  <p className="text-gray-600 dark:text-gray-300">{elective.domain}</p>
+                  <h4 className="font-medium text-gray-900 dark:text-white">track</h4>
+                  <p className="text-gray-600 dark:text-gray-300">{elective.track}</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white">Department</h4>
@@ -180,7 +180,7 @@ const ElectiveInfoModal: React.FC<ElectiveInfoModalProps> = ({
                             </p>
                           </div>
                           <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            {future.domain}
+                            {future.track}
                           </span>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const electiveFeedbackSchema = new mongoose.Schema({
   student: {
@@ -44,4 +44,4 @@ const electiveFeedbackSchema = new mongoose.Schema({
 electiveFeedbackSchema.index({ student: 1, previousElective: 1 });
 electiveFeedbackSchema.index({ previousElective: 1 });
 
-module.exports = mongoose.model('ElectiveFeedback', electiveFeedbackSchema);
+export default mongoose.model('ElectiveFeedback', electiveFeedbackSchema);

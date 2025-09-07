@@ -1,11 +1,17 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
-require('dotenv').config();
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
-const authRoutes = require('./routes/auth');
-const electivesRoutes = require('./routes/electives');
+import authRoutes from './routes/auth.js';
+import electiveRoutes from './routes/electives.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config();
 
 const app = express();
 
@@ -21,7 +27,7 @@ app.get('/api/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/electives', electivesRoutes);
+app.use('/api/electives', electiveRoutes);
 
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, '../dist')));

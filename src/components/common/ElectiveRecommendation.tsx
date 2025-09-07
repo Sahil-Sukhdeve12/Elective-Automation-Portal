@@ -82,8 +82,8 @@ const ElectiveRecommendation: React.FC<ElectiveRecommendationProps> = ({
   const getMatchScore = (elective: Elective) => {
     let score = 0;
     
-    // Domain matching
-    if (preferences.interests.includes(elective.domain)) score += 3;
+    // track matching
+    if (preferences.interests.includes(elective.track)) score += 3;
     
     // Career goal keyword matching
     if (elective.description.toLowerCase().includes(preferences.careerGoals.toLowerCase())) score += 2;
@@ -98,8 +98,8 @@ const ElectiveRecommendation: React.FC<ElectiveRecommendationProps> = ({
   const getRecommendationReason = (elective: Elective) => {
     const reasons = [];
     
-    if (preferences.interests.includes(elective.domain)) {
-      reasons.push(`Matches your interest in ${elective.domain}`);
+    if (preferences.interests.includes(elective.track)) {
+      reasons.push(`Matches your interest in ${elective.track}`);
     }
     
     if (elective.description.toLowerCase().includes(preferences.careerGoals.toLowerCase())) {
@@ -242,7 +242,7 @@ const ElectiveRecommendation: React.FC<ElectiveRecommendationProps> = ({
                         #{index + 1} {elective.name}
                       </h4>
                       <p className="text-sm text-green-600 dark:text-green-300">
-                        {elective.code} • {elective.domain} • {elective.credits} Credits
+                        {elective.code} • {elective.track} • {elective.credits} Credits
                       </p>
                     </div>
                     <div className="text-right">

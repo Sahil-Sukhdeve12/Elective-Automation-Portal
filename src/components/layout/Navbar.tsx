@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useData } from '../../contexts/DataContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { GraduationCap, LogOut, User, BarChart3, BookOpen, Map, Moon, Sun } from 'lucide-react';
+import { GraduationCap, LogOut, User, BarChart3, BookOpen, Map, Moon, Sun, MessageSquare } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const { getActiveFeedbackTemplates } = useData();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,17 +23,22 @@ const Navbar: React.FC = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Get active feedback templates for students
+  const activeFeedbackTemplates = user.role === 'student' ? getActiveFeedbackTemplates() : [];
+
   const studentNavItems = [
     { path: '/electives', label: 'Electives', icon: BookOpen },
     { path: '/progress', label: 'Progress', icon: BarChart3 },
     { path: '/roadmap', label: 'Roadmap', icon: Map },
     { path: '/profile', label: 'Profile', icon: User },
+    ...(activeFeedbackTemplates.length > 0 ? [{ path: '/feedback', label: 'Feedback', icon: MessageSquare }] : [])
   ];
 
   const adminNavItems = [
     { path: '/admin', label: 'Dashboard', icon: BarChart3 },
     { path: '/admin/electives', label: 'Manage Electives', icon: BookOpen },
     { path: '/admin/students', label: 'Students', icon: User },
+    { path: '/admin/system', label: 'System Management', icon: BarChart3 },
   ];
 
   const navItems = user.role === 'admin' ? adminNavItems : studentNavItems;
@@ -43,7 +50,7 @@ const Navbar: React.FC = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
               <GraduationCap className="w-8 h-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900 dark:text-white">ElectivePro</span>
+              <span className="text-xl font-bold text-gray-900 dark:text-white">Elective </span>
             </Link>
           </div>
 

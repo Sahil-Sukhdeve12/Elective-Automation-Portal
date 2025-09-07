@@ -1,3 +1,26 @@
+/**
+ * DATA CONTEXT PROVIDER
+ * 
+ * Central data management system for the Elective Selection System.
+ * Handles all CRUD operations, export functionality, and data persistence.
+ * 
+ * Key Features:
+ * - Student and elective data management
+ * - Excel and PDF export capabilities with roll numbers
+ * - Local storage persistence
+ * - Real-time data synchronization
+ * - Comprehensive reporting system
+ * 
+ * Export Features:
+ * - Student reports include roll numbers for identification
+ * - Excel format with multiple worksheets
+ * - PDF format with formatted tables
+ * - Custom data filtering and sorting
+ * 
+ * @author Sahil Sukhdeve
+ * @version 1.0.0
+ */
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface Student {

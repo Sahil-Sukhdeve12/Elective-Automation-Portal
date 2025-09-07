@@ -1,7 +1,5 @@
 // API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.DEV ? '/api' : 'https://your-backend-url.railway.app/api'
-);
+const API_BASE_URL = '/api';
 
 // Types
 export interface User {

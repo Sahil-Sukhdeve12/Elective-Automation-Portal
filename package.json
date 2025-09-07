@@ -15,6 +15,7 @@
     "server:dev": "nodemon simple-server.cjs",
     "seed": "node server/seed.js",
     "export-users": "node server/export-users.js",
+    "view-users": "node view-users.cjs",
     "start": "npm run build && npm run server"
   },
   "dependencies": {

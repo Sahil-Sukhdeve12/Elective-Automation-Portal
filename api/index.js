@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema({
   name: String,
   email: String,
   password: String,
+  rollNumber: String,
   studentId: String,
   department: String,
   semester: Number,

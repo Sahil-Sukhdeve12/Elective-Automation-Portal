@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
+  rollNumber: {
+    type: String,
+    required: function() { return this.role === 'student'; },
+    unique: true,
+    sparse: true // Allow multiple null values for admin users
+  },
   role: {
     type: String,
     enum: ['student', 'admin'],

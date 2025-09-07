@@ -83,10 +83,13 @@ export interface Track {
 export interface StudentElective {
   id: string;
   studentId: string;
+  rollNumber?: string;
+  studentName?: string;
   electiveId: string;
   elective?: Elective;
   semester: number;
   dateSelected: string;
+  enrolledAt?: string;
   track: string;
   feedback?: {
     rating: number;
@@ -1086,14 +1089,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const studentElectiveData = studentElectives.map(se => {
         const elective = electives.find(e => e.id === se.electiveId);
         return {
+          'Roll Number': se.rollNumber || 'Not Available',
           'Student ID': se.studentId,
+          'Student Name': se.studentName || 'Unknown',
           'Elective Name': elective?.name || 'Unknown',
           'Code': elective?.code || 'Unknown',
           'Semester': se.semester,
           'Track': se.track,
           'Department': elective?.department || 'Unknown',
           'Credits': elective?.credits || 0,
-          'Completed Date': se.completedAt.toLocaleDateString()
+          'Enrolled Date': se.enrolledAt ? new Date(se.enrolledAt).toLocaleDateString() : 'Unknown'
         };
       });
 
@@ -1133,19 +1138,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const studentTableData = studentElectives.map(se => {
           const elective = electives.find(e => e.id === se.electiveId);
           return [
+            se.rollNumber || 'N/A',
             se.studentId,
+            se.studentName || 'Unknown',
             elective?.name || 'Unknown',
             elective?.code || 'Unknown',
             se.semester.toString(),
             se.track,
             elective?.department || 'Unknown',
             (elective?.credits || 0).toString(),
-            se.completedAt.toLocaleDateString()
+            se.enrolledAt ? new Date(se.enrolledAt).toLocaleDateString() : se.dateSelected
           ];
         });
 
         doc.autoTable({
-          head: [['Student ID', 'Elective Name', 'Code', 'Semester', 'Track', 'Department', 'Credits', 'Date']],
+          head: [['Roll No.', 'Student ID', 'Student Name', 'Elective Name', 'Code', 'Semester', 'Track', 'Department', 'Credits', 'Date']],
           body: studentTableData,
           startY: 60,
           styles: { fontSize: 8 },

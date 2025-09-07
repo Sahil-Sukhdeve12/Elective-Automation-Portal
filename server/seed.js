@@ -53,12 +53,13 @@ const seedData = async () => {
       name: 'John Doe',
       email: 'student@college.edu',
       password: studentPassword,
+      rollNumber: '2021CS001',
       role: 'student',
       department: 'Computer Science',
       semester: 5
     });
     await student.save();
-    console.log('Created student user: student@college.edu / student123');
+    console.log('Created student user: student@college.edu / student123 (Roll: 2021CS001)');
 
     // Create sample electives
     const electives = [

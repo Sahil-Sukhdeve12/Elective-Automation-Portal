@@ -6,6 +6,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  rollNumber?: string;
   role: 'student' | 'admin';
   department?: string;
   semester?: number;
@@ -26,6 +27,7 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
+  rollNumber?: string;
   role: 'student' | 'admin';
   department?: string;
   semester?: number;

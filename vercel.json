@@ -21,6 +21,5 @@
       "src": "/(.*)",
       "dest": "/dist/index.html"
     }
-  ],
-  "cleanUrls": true
+  ]
 }

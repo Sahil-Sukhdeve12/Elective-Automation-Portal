@@ -40,16 +40,21 @@ app.use(express.json());
 
 /**
  * Connect to MongoDB Atlas using connection string from environment variables
- * Uses global connection to prevent multiple connections in serverless environment
+ * Uses cached connection to prevent multiple connections in serverless environment
  */
-if (!global.mongoose) {
-  global.mongoose = mongoose.connect(
-    process.env.MONGODB_URI || 'mongodb://localhost:27017/elective-system', 
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    }
+let cachedDb = null;
+
+async function connectToDatabase() {
+  if (cachedDb) {
+    return cachedDb;
+  }
+
+  const connection = await mongoose.connect(
+    process.env.MONGODB_URI || 'mongodb://localhost:27017/elective-system'
   );
+  
+  cachedDb = connection;
+  return connection;
 }
 
 // ================================
@@ -181,6 +186,17 @@ const authenticateToken = async (req, res, next) => {
 // API ROUTES
 // ================================
 
+// Database connection middleware
+app.use(async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    console.error('Database connection error:', error);
+    res.status(500).json({ error: 'Database connection failed' });
+  }
+});
+
 /**
  * Health Check Endpoint
  * 
@@ -192,7 +208,8 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     message: 'Elective Selection System API is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
@@ -205,10 +222,17 @@ app.get('/api/health', (req, res) => {
  */
 app.post('/api/auth/register', async (req, res) => {
   try {
+    console.log('Registration request received:', { 
+      body: req.body, 
+      headers: req.headers,
+      timestamp: new Date().toISOString() 
+    });
+    
     const { name, email, password, role, rollNumber, department, semester } = req.body;
 
     // Validate required fields
     if (!name || !email || !password) {
+      console.log('Validation failed: Missing required fields');
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
@@ -220,16 +244,20 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
+    console.log('Checking for existing user with email:', email);
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists with this email' });
+      console.log('User already exists with email:', email);
+      return res.status(400).json({ error: 'Email or registration number already exists' });
     }
 
     // Check if roll number already exists (for students)
     if (role === 'student') {
+      console.log('Checking for existing roll number:', rollNumber);
       const existingRollNumber = await User.findOne({ rollNumber });
       if (existingRollNumber) {
-        return res.status(400).json({ error: 'Roll number already exists' });
+        console.log('Roll number already exists:', rollNumber);
+        return res.status(400).json({ error: 'Email or registration number already exists' });
       }
     }
 
@@ -271,9 +299,22 @@ app.post('/api/auth/register', async (req, res) => {
         semester: newUser.semester
       }
     });
+    
+    console.log('User registered successfully:', { 
+      userId: newUser._id, 
+      email: newUser.email, 
+      role: newUser.role 
+    });
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ error: 'Internal server error during registration' });
+    console.error('Registration error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ 
+      error: 'Internal server error during registration',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

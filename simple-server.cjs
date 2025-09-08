@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 
 const app = express();
 
@@ -14,10 +14,7 @@ app.use(cors({
 app.use(express.json());
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
+mongoose.connect(process.env.MONGODB_URI).then(() => {
   console.log('✅ Connected to MongoDB Atlas');
 }).catch((error) => {
   console.error('❌ MongoDB connection error:', error);

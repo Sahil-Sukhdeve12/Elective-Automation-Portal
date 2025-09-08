@@ -45,17 +45,26 @@ app.use(express.json());
 let cachedDb = null;
 
 async function connectToDatabase() {
-  if (cachedDb) {
+  if (cachedDb && mongoose.connection.readyState === 1) {
     return cachedDb;
   }
 
-  const connection = await mongoose.connect(
-    process.env.MONGODB_URI || 'mongodb://localhost:27017/elective-system'
-  );
-  
-  cachedDb = connection;
-  return connection;
+  try {
+    const connection = await mongoose.connect(
+      process.env.MONGODB_URI || 'mongodb://localhost:27017/elective-system'
+    );
+    
+    cachedDb = connection;
+    console.log('MongoDB connected successfully');
+    return connection;
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  }
 }
+
+// Initialize database connection
+connectToDatabase().catch(console.error);
 
 // ================================
 // DATABASE SCHEMAS & MODELS
@@ -186,45 +195,55 @@ const authenticateToken = async (req, res, next) => {
 // API ROUTES
 // ================================
 
-// Database connection middleware
-app.use(async (req, res, next) => {
-  try {
-    await connectToDatabase();
-    next();
-  } catch (error) {
-    console.error('Database connection error:', error);
-    res.status(500).json({ error: 'Database connection failed' });
-  }
-});
-
 /**
  * Health Check Endpoint
  * 
  * Simple endpoint to verify API is running and database is connected.
  * Used for monitoring and deployment verification.
  */
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Elective Selection System API is running',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    environment: process.env.NODE_ENV || 'development'
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    await connectToDatabase();
+    res.json({ 
+      status: 'OK', 
+      message: 'Elective Selection System API is running',
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      database: 'connected',
+      environment: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      message: 'Database connection failed',
+      error: error.message
+    });
+  }
 });
 
 /**
  * Debug Endpoint - Check Environment
  */
-app.get('/api/debug', (req, res) => {
-  res.json({
-    environment: process.env.NODE_ENV,
-    hasMongoUri: !!process.env.MONGODB_URI,
-    hasJwtSecret: !!process.env.JWT_SECRET,
-    mongoConnection: mongoose.connection.readyState,
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/debug', async (req, res) => {
+  try {
+    await connectToDatabase();
+    res.json({
+      environment: process.env.NODE_ENV,
+      hasMongoUri: !!process.env.MONGODB_URI,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      mongoConnection: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      environment: process.env.NODE_ENV,
+      hasMongoUri: !!process.env.MONGODB_URI,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      mongoConnection: 'failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 /**
@@ -236,6 +255,9 @@ app.get('/api/debug', (req, res) => {
  */
 app.post('/api/auth/register', async (req, res) => {
   try {
+    // Ensure database connection
+    await connectToDatabase();
+    
     console.log('Registration request received:', { 
       body: req.body, 
       headers: req.headers,
@@ -340,6 +362,9 @@ app.post('/api/auth/register', async (req, res) => {
  */
 app.post('/api/auth/login', async (req, res) => {
   try {
+    // Ensure database connection
+    await connectToDatabase();
+    
     const { email, password } = req.body;
 
     // Validate input

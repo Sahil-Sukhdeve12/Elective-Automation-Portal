@@ -11,7 +11,7 @@ import electiveRoutes from './routes/electives.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const app = express();
 
@@ -50,10 +50,7 @@ app.use((err, req, res, next) => {
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/elective-selection';
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(mongoURI);
     console.log('Connected to MongoDB');
   } catch (error) {
     console.error('Database connection error:', error);

@@ -201,22 +201,32 @@ const authenticateToken = async (req, res, next) => {
  * Simple endpoint to verify API is running and database is connected.
  * Used for monitoring and deployment verification.
  */
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'API is running',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
+  });
+});
+
+/**
+ * Test Database Connection
+ */
+app.get('/api/test-db', async (req, res) => {
   try {
     await connectToDatabase();
     res.json({ 
       status: 'OK', 
-      message: 'Elective Selection System API is running',
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      database: 'connected',
-      environment: process.env.NODE_ENV || 'development'
+      message: 'Database connected successfully',
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({
       status: 'ERROR',
       message: 'Database connection failed',
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
   }
 });

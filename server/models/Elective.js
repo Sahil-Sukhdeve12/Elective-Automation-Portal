@@ -40,6 +40,20 @@ const electiveSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // For Open Category electives - which department offers this elective
+  offeredBy: {
+    type: String,
+    required: function() {
+      return this.electiveCategory === 'Open Elective';
+    }
+  },
+  // For Open Category electives - which departments can take this elective
+  eligibleDepartments: [{
+    type: String,
+    required: function() {
+      return this.electiveCategory === 'Open Elective';
+    }
+  }],
   category: {
     type: String,
     enum: ['Theory', 'Practical'],

@@ -30,6 +30,9 @@ const AdminElectives: React.FC = () => {
     department: '',
     category: 'Theory' as 'Theory' | 'Practical',
     electiveCategory: 'Departmental' as 'Humanities' | 'Departmental' | 'Open',
+    // New fields for Open electives
+    offeredBy: '',
+    eligibleDepartments: [] as string[],
     infoImage: '',
     selectionDeadline: '',
     futureOptions: [] as string[],
@@ -71,6 +74,8 @@ const AdminElectives: React.FC = () => {
         department: elective.department || '',
         category: 'Theory',
         electiveCategory: elective.category as 'Humanities' | 'Departmental' | 'Open',
+        offeredBy: elective.offeredBy || '',
+        eligibleDepartments: elective.eligibleDepartments || [],
         infoImage: elective.image || '',
         selectionDeadline: elective.selectionDeadline || '',
         futureOptions: [],
@@ -90,6 +95,8 @@ const AdminElectives: React.FC = () => {
         department: '',
         category: 'Theory',
         electiveCategory: 'Departmental',
+        offeredBy: '',
+        eligibleDepartments: [],
         infoImage: '',
         selectionDeadline: '',
         futureOptions: [],
@@ -108,6 +115,27 @@ const AdminElectives: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate Open elective fields
+    if (formData.electiveCategory === 'Open') {
+      if (!formData.offeredBy) {
+        addNotification({
+          type: 'error',
+          title: 'Validation Error',
+          message: 'Please select which department is offering this open elective.'
+        });
+        return;
+      }
+      
+      if (formData.eligibleDepartments.length === 0) {
+        addNotification({
+          type: 'error',
+          title: 'Validation Error',
+          message: 'Please select at least one department that can take this open elective.'
+        });
+        return;
+      }
+    }
+    
     // Create elective data matching the interface
     const electiveData = {
       name: formData.name,
@@ -120,6 +148,11 @@ const AdminElectives: React.FC = () => {
       department: formData.department,
       category: formData.electiveCategory as 'Departmental' | 'Humanities' | 'Open',
       electiveCategory: 'Elective' as const,
+      // Include new multi-department fields for Open electives
+      ...(formData.electiveCategory === 'Open' && {
+        offeredBy: formData.offeredBy,
+        eligibleDepartments: formData.eligibleDepartments
+      }),
       image: formData.infoImage || undefined, // Include the image
       selectionDeadline: formData.selectionDeadline || undefined, // Include the deadline
     };
@@ -168,7 +201,27 @@ const AdminElectives: React.FC = () => {
         newData.track = '';
       }
       
+      // Reset open elective specific fields when changing away from Open category
+      if (name === 'electiveCategory' && value !== 'Open') {
+        newData.offeredBy = '';
+        newData.eligibleDepartments = [];
+      }
+      
       return newData;
+    });
+  };
+
+  const handleEligibleDepartmentToggle = (department: string) => {
+    setFormData(prev => {
+      const currentDepts = prev.eligibleDepartments;
+      const isSelected = currentDepts.includes(department);
+      
+      return {
+        ...prev,
+        eligibleDepartments: isSelected 
+          ? currentDepts.filter(d => d !== department)
+          : [...currentDepts, department]
+      };
     });
   };
 
@@ -226,6 +279,22 @@ const AdminElectives: React.FC = () => {
       </div>
 
       <p className="text-gray-700 mb-3 text-sm">{elective.description}</p>
+
+      {/* Multi-department info for Open electives */}
+      {elective.category === 'Open' && (elective.offeredBy || elective.eligibleDepartments) && (
+        <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
+          {elective.offeredBy && (
+            <p className="text-xs text-green-700 mb-1">
+              <span className="font-medium">Offered by:</span> {elective.offeredBy}
+            </p>
+          )}
+          {elective.eligibleDepartments && elective.eligibleDepartments.length > 0 && (
+            <p className="text-xs text-green-700">
+              <span className="font-medium">Available to:</span> {elective.eligibleDepartments.join(', ')}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
         <span>{elective.credits} Credits</span>
@@ -449,6 +518,59 @@ const AdminElectives: React.FC = () => {
                     ))}
                   </select>
                 </div>
+
+                {/* Open Elective specific fields */}
+                {formData.electiveCategory === 'Open' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Offered By Department *
+                      </label>
+                      <select
+                        name="offeredBy"
+                        value={formData.offeredBy}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      >
+                        <option value="">Select Department</option>
+                        {getAvailableDepartments().map(dept => (
+                          <option key={dept} value={dept}>{dept}</option>
+                        ))}
+                      </select>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Which department is offering this open elective
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Eligible Departments *
+                      </label>
+                      <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-md p-3">
+                        {getAvailableDepartments().map(dept => (
+                          <label key={dept} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={formData.eligibleDepartments.includes(dept)}
+                              onChange={() => handleEligibleDepartmentToggle(dept)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{dept}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Select which departments can take this open elective
+                      </p>
+                      {formData.eligibleDepartments.length === 0 && (
+                        <p className="text-sm text-red-600 mt-1">
+                          Please select at least one eligible department
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

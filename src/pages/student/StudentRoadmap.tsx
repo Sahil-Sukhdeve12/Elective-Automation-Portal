@@ -571,6 +571,13 @@ const StudentRoadmap: React.FC = () => {
                                       <h5 className="font-medium text-gray-900 dark:text-white">{elective.name}</h5>
                                       <p className="text-sm text-gray-600 dark:text-gray-300">{elective.code} • {elective.credits} Credits</p>
                                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{elective.description}</p>
+                                      
+                                      {/* Multi-department info for Open electives */}
+                                      {elective.category === 'Open' && elective.offeredBy && (
+                                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                          <span className="font-medium">Offered by:</span> {elective.offeredBy}
+                                        </p>
+                                      )}
                                     </div>
                                     <div className="flex flex-col gap-1">
                                       <span className={`px-2 py-1 rounded text-xs text-white ${

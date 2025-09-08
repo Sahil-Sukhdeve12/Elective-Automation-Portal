@@ -115,7 +115,7 @@ const StudentElectiveSelection: React.FC = () => {
 
     const descriptions = {
       'Departmental': 'Advanced courses in your department specialization',
-      'Open': 'Courses from any department to broaden your knowledge',
+      'Open': 'Courses from various departments available to multiple departments - check eligibility',
       'Humanities': 'Philosophy, communication, economics, and management courses'
     };
 
@@ -442,6 +442,26 @@ const StudentElectiveSelection: React.FC = () => {
                       <span className="text-sm text-gray-600 dark:text-gray-400">
                         {elective.prerequisites.join(', ')}
                       </span>
+                    </div>
+                  )}
+
+                  {/* Multi-department info for Open electives */}
+                  {elective.category === 'Open' && (elective.offeredBy || (elective.eligibleDepartments && elective.eligibleDepartments.length > 0)) && (
+                    <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      {elective.offeredBy && (
+                        <div className="mb-1">
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">Offered by: </span>
+                          <span className="text-sm text-green-600 dark:text-green-400">{elective.offeredBy}</span>
+                        </div>
+                      )}
+                      {elective.eligibleDepartments && elective.eligibleDepartments.length > 0 && (
+                        <div>
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">Available to: </span>
+                          <span className="text-sm text-green-600 dark:text-green-400">
+                            {elective.eligibleDepartments.join(', ')}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
 

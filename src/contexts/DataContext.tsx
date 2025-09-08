@@ -73,6 +73,9 @@ export interface Elective {
   category: 'Departmental' | 'Open' | 'Humanities';
   electiveCategory: 'Core' | 'Elective' | 'Lab';
   department: string;
+  // For Open Category electives
+  offeredBy?: string; // Which department offers this elective
+  eligibleDepartments?: string[]; // Which departments can take this elective
   semester: number;
   track: string;
   image?: string; // Optional image URL for the elective
@@ -973,7 +976,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getElectivesByCategoryAndDepartment = (category: string, department?: string, semester?: number): Elective[] => {
     const mappedCategory = category === 'Open Elective' ? 'Open' : category as 'Humanities' | 'Departmental' | 'Open';
     return electives.filter(e => {
-      const categoryMatch = e.category === mappedCategory && (category !== 'Departmental' || e.department === department);
+      let categoryMatch = false;
+      
+      if (mappedCategory === 'Open') {
+        // For Open electives, check if the user's department is in eligibleDepartments
+        // or if no eligibleDepartments is specified (backward compatibility)
+        const hasEligibleDepts = e.eligibleDepartments && e.eligibleDepartments.length > 0;
+        const isDeptEligible = department && hasEligibleDepts ? e.eligibleDepartments!.includes(department) : true;
+        categoryMatch = e.category === mappedCategory && (!hasEligibleDepts || isDeptEligible);
+      } else if (mappedCategory === 'Departmental') {
+        // For Departmental electives, must match user's department
+        categoryMatch = e.category === mappedCategory && e.department === department;
+      } else {
+        // For Humanities and other categories
+        categoryMatch = e.category === mappedCategory;
+      }
+      
       const semesterMatch = semester ? e.semester === semester : true;
       return categoryMatch && semesterMatch;
     });

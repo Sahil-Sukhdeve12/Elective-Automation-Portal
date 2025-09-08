@@ -138,7 +138,7 @@ const Register: React.FC = () => {
     
     <div className="h-screen w-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900 flex justify-center px-4 sm:px-6 lg:px-8 transition-colors duration-200 overflow-y-auto fixed inset-0">
       <div className="max-w-md w-full py-4 flex flex-col justify-center">
-        
+        <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
         <div className="mb-12"></div>
         <div className="text-center">
           <div className="flex justify-center">

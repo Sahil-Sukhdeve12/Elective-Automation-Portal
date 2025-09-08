@@ -16,7 +16,8 @@
     "seed": "node server/seed.js",
     "export-users": "node server/export-users.js",
     "view-users": "node view-users.cjs",
-    "start": "npm run build && npm run server"
+    "start": "npm run build && npm run server",
+    "vercel-build": "npm run build"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

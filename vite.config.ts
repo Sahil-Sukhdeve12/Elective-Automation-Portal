@@ -8,14 +8,17 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   server: {
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:5000',
-        changeOrigin: true,
-        secure: false,
-        ws: true,
-        timeout: 60000,
+    // Only use proxy in development
+    ...(process.env.NODE_ENV !== 'production' && {
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:5000',
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+          timeout: 60000,
+        },
       },
-    },
+    }),
   },
 });

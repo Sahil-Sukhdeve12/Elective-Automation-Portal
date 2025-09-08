@@ -209,7 +209,21 @@ app.get('/api/health', (req, res) => {
     message: 'Elective Selection System API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+/**
+ * Debug Endpoint - Check Environment
+ */
+app.get('/api/debug', (req, res) => {
+  res.json({
+    environment: process.env.NODE_ENV,
+    hasMongoUri: !!process.env.MONGODB_URI,
+    hasJwtSecret: !!process.env.JWT_SECRET,
+    mongoConnection: mongoose.connection.readyState,
+    timestamp: new Date().toISOString()
   });
 });
 

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { GraduationCap, User, Mail, Lock, Phone, Hash, Building, CreditCard } from 'lucide-react';
+import { GraduationCap, User, Mail, Lock, Phone, Building } from 'lucide-react';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -11,8 +11,6 @@ const Register: React.FC = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    rollNo: '',
-    rollNumber: '',
     department: '',
     semester: 5,
     section: '',
@@ -52,7 +50,7 @@ const Register: React.FC = () => {
   };
 
   const validateForm = () => {
-    const { name, email, password, confirmPassword, rollNo, rollNumber } = formData;
+    const { name, email, password, confirmPassword } = formData;
     
     if (name.length < 3 || name.length > 60) {
       addNotification({
@@ -99,24 +97,6 @@ const Register: React.FC = () => {
       return false;
     }
 
-    if (!/^[a-zA-Z0-9]+$/.test(rollNo)) {
-      addNotification({
-        type: 'error',
-        title: 'Validation Error',
-        message: 'Registration number must be alphanumeric.'
-      });
-      return false;
-    }
-
-    if (!/^[0-9]+$/.test(rollNumber)) {
-      addNotification({
-        type: 'error',
-        title: 'Validation Error',
-        message: 'Roll number must be numeric only.'
-      });
-      return false;
-    }
-
     return true;
   };
 
@@ -159,14 +139,14 @@ const Register: React.FC = () => {
     <div className="h-screen w-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900 flex justify-center px-4 sm:px-6 lg:px-8 transition-colors duration-200 overflow-y-auto fixed inset-0">
       <div className="max-w-md w-full py-4 flex flex-col justify-center">
         <br/>
-  <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
+  <br/><br/><br/><br/><br/><br/><br/>
         <div className="text-center">
           <div className="flex justify-center">
             <GraduationCap className="w-16 h-16 text-blue-600" />
           </div>
+          {/* <br/>
           <br/>
-          <br/>
-          <br/>
+          <br/> */}
           <h1 className="mt-4 text-6xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
             SIGN UP HERE
           </h1>
@@ -215,44 +195,6 @@ const Register: React.FC = () => {
                     onChange={handleChange}
                     className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                     placeholder="Enter your email"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="rollNo" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Registration Number *
-                </label>
-                <div className="mt-1 relative">
-                  <Hash className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <input
-                    id="rollNo"
-                    name="rollNo"
-                    type="text"
-                    required
-                    value={formData.rollNo}
-                    onChange={handleChange}
-                    className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., 2223CRPFTAIE120"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="rollNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Roll No *
-                </label>
-                <div className="mt-1 relative">
-                  <CreditCard className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                  <input
-                    id="rollNumber"
-                    name="rollNumber"
-                    type="text"
-                    required
-                    value={formData.rollNumber}
-                    onChange={handleChange}
-                    className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., 120"
                   />
                 </div>
               </div>

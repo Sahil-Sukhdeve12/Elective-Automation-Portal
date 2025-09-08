@@ -174,7 +174,7 @@ const Login: React.FC = () => {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
 
-            <div className="flex space-x-2">
+            {/* <div className="flex space-x-2">
               <button
                 type="button"
                 onClick={() => handleDemoLogin('student')}
@@ -189,7 +189,9 @@ const Login: React.FC = () => {
               >
                 Demo Admin
               </button>
-            </div>
+            </div> */}
+            
+
 
             <div className="text-center">
               <span className="text-sm text-gray-600 dark:text-gray-300">

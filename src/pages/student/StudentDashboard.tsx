@@ -18,6 +18,59 @@ const StudentDashboard: React.FC = () => {
   // Get alerts relevant to the student
   const relevantAlerts = getActiveAlerts(user.department, user.semester);
 
+  // Show basic content if no data is loaded yet
+  if (electives.length === 0) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Welcome back, {user.name}!
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {user.department} • Semester {user.semester}
+          </p>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+          <div className="flex items-center">
+            <BookOpen className="h-8 w-8 text-blue-600 mr-3" />
+            <div>
+              <h3 className="text-lg font-semibold text-blue-900">Loading Your Data...</h3>
+              <p className="text-blue-700 mt-1">
+                Please wait while we load your electives and course information.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Quick Actions</h3>
+            <div className="space-y-2">
+              <Link to="/student/electives" className="block text-blue-600 hover:text-blue-800">
+                Browse Electives →
+              </Link>
+              <Link to="/student/profile" className="block text-blue-600 hover:text-blue-800">
+                Update Profile →
+              </Link>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Current Semester</h3>
+            <p className="text-2xl font-bold text-green-600">{currentSemester}</p>
+            <p className="text-gray-600">Semester {currentSemester}</p>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Department</h3>
+            <p className="text-lg font-medium text-blue-600">{user.department || 'Not Set'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const trackProgress = tracks.map(track => {
     const trackElectives = studentElectives.filter(se => se.track === track.name);
     const totalIntrack = electives.filter(e => e.track === track.name).length;

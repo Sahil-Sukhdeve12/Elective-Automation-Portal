@@ -9,12 +9,45 @@ const router = express.Router();
 // Register user
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, department, semester } = req.body;
+    const { name, email, password, role, department, semester, rollNumber, rollNo } = req.body;
+
+    console.log('📝 Registration attempt:', { 
+      email, 
+      role, 
+      rollNumber, 
+      rollNo, 
+      department, 
+      semester 
+    });
+
+    // Use rollNumber if provided, otherwise fallback to rollNo
+    const finalRollNumber = rollNumber || rollNo;
+
+    // Validate required fields
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+
+    if (role === 'student' && (!finalRollNumber || !department || !semester)) {
+      return res.status(400).json({ 
+        message: 'Roll number, department, and semester are required for students' 
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'User with this email already exists' });
+      console.log('❌ User already exists:', email);
+      return res.status(400).json({ message: 'Email or registration number already exists' });
+    }
+
+    // Check if roll number already exists for students
+    if (role === 'student' && finalRollNumber) {
+      const existingRollNumber = await User.findOne({ rollNumber: finalRollNumber });
+      if (existingRollNumber) {
+        console.log('❌ Roll number already exists:', finalRollNumber);
+        return res.status(400).json({ message: 'Email or registration number already exists' });
+      }
     }
 
     // Hash password
@@ -27,11 +60,13 @@ router.post('/register', async (req, res) => {
       email,
       password: hashedPassword,
       role,
+      rollNumber: role === 'student' ? finalRollNumber : undefined,
       department: role === 'student' ? department : undefined,
       semester: role === 'student' ? semester : undefined
     });
 
     await user.save();
+    console.log('✅ User created successfully:', { email, rollNumber: finalRollNumber });
 
     // Generate JWT token
     const token = jwt.sign(

@@ -45,7 +45,6 @@ interface RegisterUserData {
   email: string;                        // Email address for login
   password: string;                     // User password
   role: 'student' | 'admin';           // User role for access control
-  rollNumber?: string;                  // Student roll number (required for students)
   department?: string;                  // Academic department (for students)
   semester?: number;                    // Current semester (for students)
 }
@@ -166,7 +165,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: userData.email,
         password: userData.password,
         role: userData.role,
-        rollNumber: userData.rollNumber,
         department: userData.department,
         semester: userData.semester
       });

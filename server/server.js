@@ -32,9 +32,9 @@ app.use('/api/electives', electiveRoutes);
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, '../dist')));
 
-// Catch all handler: send back React's index.html file for client-side routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
+// Basic route for testing
+app.get('/', (req, res) => {
+  res.json({ message: 'Elective Selection System API is running!' });
 });
 
 // Error handling middleware
@@ -75,4 +75,4 @@ const startServer = async () => {
 
 startServer();
 
-module.exports = app;
+export default app;

@@ -1,17 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useData } from '../../contexts/DataContext';
+import { useData, Student } from '../../contexts/DataContext';
 import { Search, Download, Users, FileText, CheckCircle, Filter, X } from 'lucide-react';
-
-interface Student {
-  id: string;
-  name: string;
-  email: string;
-  rollNo: string;
-  department: string;
-  semester: number;
-  section: string;
-  role: string;
-}
 
 interface ReportFilters {
   department: string;
@@ -26,6 +15,7 @@ const AdminStudents: React.FC = () => {
   const { 
     electives, 
     tracks, 
+    students,
     studentElectives, 
     getAvailableDepartments,
     getAvailableSections,
@@ -49,9 +39,8 @@ const AdminStudents: React.FC = () => {
     elective: ''
   });
 
-  // Get students from localStorage (in real app this would come from API)
-  const allStudents: Student[] = JSON.parse(localStorage.getItem('users') || '[]')
-    .filter((u: { role: string }) => u.role === 'student');
+  // Get students from DataContext
+  const allStudents: Student[] = students;
 
   // Use admin-configured departments, sections, and semesters
   const departments = getAvailableDepartments();
@@ -62,7 +51,7 @@ const AdminStudents: React.FC = () => {
   const filteredStudents = useMemo(() => {
     return allStudents.filter(student => {
       const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           student.rollNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            student.email.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesDepartment = !departmentFilter || student.department === departmentFilter;
@@ -186,7 +175,7 @@ const AdminStudents: React.FC = () => {
       }
       
       return {
-        'Roll No': student.rollNo,
+        'Roll No': student.rollNumber,
         'Name': student.name,
         'Email': student.email,
         'Department': student.department,
@@ -291,7 +280,7 @@ const AdminStudents: React.FC = () => {
 
   const handleExport = (format: 'excel' | 'pdf') => {
     const data = filteredStudents.map(student => ({
-      'Roll No': student.rollNo,
+      'Roll No': student.rollNumber,
       'Name': student.name,
       'Email': student.email,
       'Department': student.department,
@@ -495,7 +484,7 @@ const AdminStudents: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{student.name}</h3>
-                    <p className="text-sm text-gray-600">{student.rollNo}</p>
+                    <p className="text-sm text-gray-600">{student.rollNumber}</p>
                   </div>
                 </div>
                 <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">

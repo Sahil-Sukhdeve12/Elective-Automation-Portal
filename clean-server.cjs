@@ -206,7 +206,6 @@ app.get('/api/users', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        rollNumber: user.rollNumber,
         department: user.department,
         semester: user.semester,
         createdAt: user.createdAt

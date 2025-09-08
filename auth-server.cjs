@@ -7,10 +7,7 @@ require('dotenv').config();
 
 const app = express();
 
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB
@@ -28,7 +25,6 @@ const userSchema = new mongoose.Schema({
   name: String,
   email: String,
   password: String,
-  studentId: String,
   department: String,
   semester: Number,
   role: { type: String, enum: ['admin', 'student'], default: 'student' },
@@ -43,37 +39,40 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// Elective schema
-const electiveSchema = new mongoose.Schema({
-  name: String,
-  code: String,
-  department: String,
-  semester: Number,
-  credits: Number,
-  description: String,
-  instructor: String,
-  maxStudents: Number,
-  enrolledStudents: Number,
-  image: String,
-  deadline: Date,
-  category: String,
-  electiveCategory: String,
-  track: String,
-  createdAt: { type: Date, default: Date.now }
-});
-
-const Elective = mongoose.model('Elective', electiveSchema);
-
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
+  res.json({ status: 'OK', message: 'Auth server is running' });
+});
+
+// Get all users (for debugging)
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await User.find({}, '-password').sort({ createdAt: -1 });
+    console.log('👥 Found users:', users.length);
+    res.json({
+      success: true,
+      count: users.length,
+      users: users.map(user => ({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        semester: user.semester,
+        createdAt: user.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
 });
 
 // Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     console.log('🔐 Login attempt:', email);
 
     if (!email || !password) {
@@ -193,49 +192,9 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Get all users (for debugging)
-app.get('/api/users', async (req, res) => {
-  try {
-    const users = await User.find({}, '-password').sort({ createdAt: -1 });
-    console.log('👥 Found users:', users.length);
-    res.json({
-      success: true,
-      count: users.length,
-      users: users.map(user => ({
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        rollNumber: user.rollNumber,
-        department: user.department,
-        semester: user.semester,
-        createdAt: user.createdAt
-      }))
-    });
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
-  }
-});
-
-// Get all electives
-app.get('/api/electives', async (req, res) => {
-  try {
-    const electives = await Elective.find({});
-    res.json({
-      success: true,
-      count: electives.length,
-      electives: electives
-    });
-  } catch (error) {
-    console.error('Error fetching electives:', error);
-    res.status(500).json({ error: 'Failed to fetch electives' });
-  }
-});
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Authentication server running on port ${PORT}`);
+  console.log(`🚀 Auth server running on port ${PORT}`);
 });
 
 module.exports = app;

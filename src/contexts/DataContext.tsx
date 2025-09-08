@@ -23,6 +23,29 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+// API functions to fetch data from backend
+const fetchElectives = async () => {
+  try {
+    const response = await fetch('/api/electives');
+    const data = await response.json();
+    return data.electives || [];
+  } catch (error) {
+    console.error('Error fetching electives:', error);
+    return [];
+  }
+};
+
+const fetchUsers = async () => {
+  try {
+    const response = await fetch('/api/users');
+    const data = await response.json();
+    return data.users || [];
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return [];
+  }
+};
+
 export interface Student {
   id: string;
   name: string;
@@ -31,6 +54,7 @@ export interface Student {
   department: string;
   yearOfStudy: number;
   semester: number;
+  section?: string;
   cgpa: number;
   completedCredits: number;
   profile?: {
@@ -708,6 +732,7 @@ const initialElectives: Elective[] = [
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [electives, setElectives] = useState<Elective[]>([]);
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
+  const [students, setStudents] = useState<Student[]>([]);
   const [studentElectives, setStudentElectives] = useState<StudentElective[]>([]);
   const [electiveFeedbacks, setElectiveFeedbacks] = useState<ElectiveFeedbackForm[]>([]);
   
@@ -724,8 +749,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [syllabi, setSyllabi] = useState<Syllabus[]>([]);
 
   useEffect(() => {
-    // Initialize data from localStorage or use defaults
-    const storedElectives = localStorage.getItem('electives');
+    // Load data from backend API
+    const loadData = async () => {
+      console.log('🔄 Loading data from backend...');
+      
+      // Fetch electives from backend
+      const backendElectives = await fetchElectives();
+      if (backendElectives.length > 0) {
+        console.log('✅ Loaded electives from backend:', backendElectives.length);
+        setElectives(backendElectives);
+        localStorage.setItem('electives', JSON.stringify(backendElectives));
+      } else {
+        // Fallback to stored or initial data
+        const storedElectives = localStorage.getItem('electives');
+        if (storedElectives) {
+          setElectives(JSON.parse(storedElectives));
+        } else {
+          setElectives(initialElectives);
+          localStorage.setItem('electives', JSON.stringify(initialElectives));
+        }
+      }
+
+      // Fetch users from backend  
+      const backendUsers = await fetchUsers();
+      if (backendUsers.length > 0) {
+        console.log('✅ Loaded users from backend:', backendUsers.length);
+        // Convert users to students format and store them
+        const studentsData = backendUsers
+          .filter((user: any) => user.role === 'student')
+          .map((user: any) => ({
+            id: user._id || user.id,
+            name: user.name,
+            rollNumber: user.rollNumber || user.rollNo,
+            email: user.email,
+            department: user.department,
+            yearOfStudy: Math.ceil((user.semester || 1) / 2),
+            semester: user.semester || 1,
+            section: user.section || 'A',
+            cgpa: user.cgpa || 0,
+            completedCredits: user.completedCredits || 0,
+            profile: user.preferences || {
+              interests: [],
+              careerGoals: [],
+              preferredLearningStyle: ''
+            }
+          }));
+        
+        setStudents(studentsData);
+        localStorage.setItem('students', JSON.stringify(studentsData));
+      } else {
+        // Load from localStorage if backend fails
+        const storedStudents = localStorage.getItem('students');
+        if (storedStudents) {
+          setStudents(JSON.parse(storedStudents));
+        }
+      }
+    };
+
+    loadData();
+
+    // Initialize other data from localStorage or use defaults
     const storedStudentElectives = localStorage.getItem('studentElectives');
     const storedElectiveFeedbacks = localStorage.getItem('electiveFeedbacks');
     
@@ -740,13 +823,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storedAlerts = localStorage.getItem('alertNotifications');
     const storedFeedbackTemplates = localStorage.getItem('feedbackTemplates');
     const storedSyllabi = localStorage.getItem('syllabi');
-
-    if (storedElectives) {
-      setElectives(JSON.parse(storedElectives));
-    } else {
-      setElectives(initialElectives);
-      localStorage.setItem('electives', JSON.stringify(initialElectives));
-    }
 
     if (storedStudentElectives) {
       setStudentElectives(JSON.parse(storedStudentElectives));
@@ -1211,6 +1287,109 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const exportDataAsCSV = (dataType: 'students' | 'electives' | 'student-electives', filters?: any): void => {
+    let csvContent = '';
+    let filename = '';
+
+    switch (dataType) {
+      case 'students':
+        csvContent = 'ID,Name,Roll Number,Email,Department,Semester,Year of Study\n';
+        csvContent += students.map(s => 
+          `${s.id},"${s.name}","${s.rollNumber}","${s.email}","${s.department}",${s.semester},${s.yearOfStudy}`
+        ).join('\n');
+        filename = `students_${new Date().toISOString().split('T')[0]}.csv`;
+        break;
+        
+      case 'electives':
+        csvContent = 'ID,Name,Code,Credits,Department,Semester,Category,Track,Description\n';
+        csvContent += electives.map(e => 
+          `${e.id},"${e.name}","${e.code}",${e.credits},"${e.department}",${e.semester},"${e.category}","${e.track}","${e.description}"`
+        ).join('\n');
+        filename = `electives_${new Date().toISOString().split('T')[0]}.csv`;
+        break;
+        
+      case 'student-electives':
+        csvContent = 'Student ID,Student Name,Roll Number,Elective ID,Elective Name,Semester,Credits\n';
+        csvContent += studentElectives.map(se => {
+          const student = students.find(s => s.id === se.studentId);
+          const elective = electives.find(e => e.id === se.electiveId);
+          return `${se.studentId},"${student?.name || 'Unknown'}","${student?.rollNumber || 'Unknown'}",${se.electiveId},"${elective?.name || 'Unknown'}",${se.semester},${elective?.credits || 0}`;
+        }).join('\n');
+        filename = `student_electives_${new Date().toISOString().split('T')[0]}.csv`;
+        break;
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportDataAsTXT = (dataType: 'students' | 'electives' | 'student-electives', filters?: any): void => {
+    let txtContent = '';
+    let filename = '';
+
+    switch (dataType) {
+      case 'students':
+        txtContent = 'STUDENTS REPORT\n';
+        txtContent += '===============\n\n';
+        students.forEach(s => {
+          txtContent += `Name: ${s.name}\n`;
+          txtContent += `Roll Number: ${s.rollNumber}\n`;
+          txtContent += `Email: ${s.email}\n`;
+          txtContent += `Department: ${s.department}\n`;
+          txtContent += `Semester: ${s.semester}\n`;
+          txtContent += `Year of Study: ${s.yearOfStudy}\n`;
+          txtContent += '---\n';
+        });
+        filename = `students_${new Date().toISOString().split('T')[0]}.txt`;
+        break;
+        
+      case 'electives':
+        txtContent = 'ELECTIVES REPORT\n';
+        txtContent += '================\n\n';
+        electives.forEach(e => {
+          txtContent += `Name: ${e.name}\n`;
+          txtContent += `Code: ${e.code}\n`;
+          txtContent += `Credits: ${e.credits}\n`;
+          txtContent += `Department: ${e.department}\n`;
+          txtContent += `Semester: ${e.semester}\n`;
+          txtContent += `Category: ${e.category}\n`;
+          txtContent += `Track: ${e.track}\n`;
+          txtContent += `Description: ${e.description}\n`;
+          txtContent += '---\n';
+        });
+        filename = `electives_${new Date().toISOString().split('T')[0]}.txt`;
+        break;
+        
+      case 'student-electives':
+        txtContent = 'STUDENT ELECTIVES REPORT\n';
+        txtContent += '========================\n\n';
+        studentElectives.forEach(se => {
+          const student = students.find(s => s.id === se.studentId);
+          const elective = electives.find(e => e.id === se.electiveId);
+          txtContent += `Student: ${student?.name || 'Unknown'} (${student?.rollNumber || 'Unknown'})\n`;
+          txtContent += `Elective: ${elective?.name || 'Unknown'} (${elective?.code || 'Unknown'})\n`;
+          txtContent += `Semester: ${se.semester}\n`;
+          txtContent += `Credits: ${elective?.credits || 0}\n`;
+          txtContent += '---\n';
+        });
+        filename = `student_electives_${new Date().toISOString().split('T')[0]}.txt`;
+        break;
+    }
+
+    const blob = new Blob([txtContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const getElectiveRecommendation = (
     studentId: string, 
     userPreferences: { interests: string[]; careerGoals: string; difficulty: string }
@@ -1403,6 +1582,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <DataContext.Provider value={{
       electives,
       tracks,
+      students,
       studentElectives,
       electiveFeedbacks,
       addElective,
@@ -1423,6 +1603,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       getFutureElectives,
       exportDataAsExcel,
       exportDataAsPDF,
+      exportDataAsCSV,
+      exportDataAsTXT,
       getElectiveRecommendation,
       getAvailableDepartments,
       getAvailableSections,

@@ -6,7 +6,6 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  rollNumber?: string;
   role: 'student' | 'admin';
   department?: string;
   semester?: number;
@@ -27,7 +26,6 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
-  rollNumber?: string;
   role: 'student' | 'admin';
   department?: string;
   semester?: number;
@@ -94,7 +92,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('authToken'); // Changed from 'token' to 'authToken'
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -114,7 +112,7 @@ export const authApi = {
     
     // Store token in localStorage
     if (result.token) {
-      localStorage.setItem('token', result.token);
+      localStorage.setItem('authToken', result.token); // Changed from 'token' to 'authToken'
     }
     
     return result;
@@ -131,7 +129,7 @@ export const authApi = {
     
     // Store token in localStorage
     if (result.token) {
-      localStorage.setItem('token', result.token);
+      localStorage.setItem('authToken', result.token); // Changed from 'token' to 'authToken'
     }
     
     return result;

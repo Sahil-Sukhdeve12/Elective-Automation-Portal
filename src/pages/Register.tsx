@@ -137,28 +137,24 @@ const Register: React.FC = () => {
   return (
     
     <div className="h-screen w-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-blue-900 flex justify-center px-4 sm:px-6 lg:px-8 transition-colors duration-200 overflow-y-auto fixed inset-0">
-      <div className="max-w-md w-full py-4 flex flex-col justify-center">
-        <br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/><br/>
-        <div className="mb-12"></div>
-        <div className="text-center">
+      <div className="max-w-md w-full flex flex-col justify-start min-h-screen">
+        
+        <div className="text-center mt-4 mb-4">
           <div className="flex justify-center">
             <GraduationCap className="w-16 h-16 text-blue-600" />
           </div>
-          {/* <br/>
-          <br/>
-          <br/> */}
-          <h1 className="mt-4 text-6xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
+          <h1 className="mt-3 text-4xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
             SIGN UP HERE
           </h1>
-          <h2 className="mt-3 text-3xl font-bold text-gray-800 dark:text-gray-200">
+          <h2 className="mt-2 text-2xl font-bold text-gray-800 dark:text-gray-200">
             Create your account
           </h2>
-          <p className="mt-2 text-base text-gray-600 dark:text-gray-300 font-medium">
+          <p className="mt-1 text-base text-gray-600 dark:text-gray-300 font-medium">
             Join Elective Selection Portal to start your academic journey
           </p>
         </div>
 
-        <form className="mt-6 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-3 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
               <div>

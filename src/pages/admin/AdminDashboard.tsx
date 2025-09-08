@@ -237,6 +237,7 @@ const AdminDashboard: React.FC = () => {
     electives, 
     tracks, 
     studentElectives, 
+    students, // Add students from DataContext
     getAvailableDepartments,
     createAlert,
     getActiveAlerts,
@@ -249,9 +250,8 @@ const AdminDashboard: React.FC = () => {
   // Get admin-configured departments only
   const departments = getAvailableDepartments();
 
-  // Calculate analytics
-  const totalStudents = JSON.parse(localStorage.getItem('users') || '[]')
-    .filter((u: { role: string }) => u.role === 'student').length;
+  // Calculate analytics - use students from DataContext instead of localStorage
+  const totalStudents = students.length;
   
   const totalElectives = electives.length;
 

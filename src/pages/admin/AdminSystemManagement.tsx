@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useData } from '../../contexts/DataContext';
+import React, { useState, useCallback } from 'react';
+import { useData, Track } from '../../contexts/DataContext';
 import { Plus, Edit2, Trash2, Save, X, Settings, Tag, MapPin } from 'lucide-react';
 
 const AdminSystemManagement: React.FC = () => {
@@ -32,7 +32,7 @@ const AdminSystemManagement: React.FC = () => {
     department: '',
     description: '',
     color: '#4F46E5',
-    category: 'Departmental' as 'Departmental' | 'Open' | 'Humanities',
+    category: 'Departmental',
     suggestedElectives: [] as string[],
     prerequisites: [] as string[],
     careerOutcomes: [] as string[],
@@ -44,7 +44,7 @@ const AdminSystemManagement: React.FC = () => {
   const [newDepartment, setNewDepartment] = useState('');
   const [newSection, setNewSection] = useState('');
   const [newSemester, setNewSemester] = useState(5);
-  const [newCategory, setNewCategory] = useState<'Departmental' | 'Open' | 'Humanities'>('Departmental');
+  const [newCategory, setNewCategory] = useState(''); // Changed to string to allow custom input
 
   const departments = getAvailableDepartments();
   const sections = getAvailableSections();
@@ -88,7 +88,7 @@ const AdminSystemManagement: React.FC = () => {
     }
   };
 
-  const handleEditTrack = (track: any) => {
+  const handleEditTrack = (track: Track) => {
     setEditingItem(track.id);
     setTrackForm({
       name: track.name,
@@ -145,14 +145,31 @@ const AdminSystemManagement: React.FC = () => {
     }
   };
 
-  const handleAddCategory = () => {
-    const success = addCategory(newCategory);
-    if (success) {
-      // Category added successfully
-    } else {
-      alert('Category already exists!');
+  const handleAddCategory = useCallback(() => {
+    const categoryName = newCategory.trim();
+    
+    if (!categoryName) {
+      alert('Please enter a category name.');
+      return;
     }
-  };
+    
+    if (categoryName.length < 2) {
+      alert('Category name must be at least 2 characters long.');
+      return;
+    }
+    
+    try {
+      const success = addCategory(categoryName);
+      if (success) {
+        setNewCategory(''); // Reset the input field
+      } else {
+        alert(`Category "${categoryName}" already exists!`);
+      }
+    } catch (error) {
+      console.error('Error adding category:', error);
+      alert('An error occurred while adding the category. Please try again.');
+    }
+  }, [newCategory, addCategory]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
@@ -180,7 +197,7 @@ const AdminSystemManagement: React.FC = () => {
                   <button
                     key={tab.id}
                     onClick={() => {
-                      setActiveTab(tab.id as any);
+                      setActiveTab(tab.id as 'tracks' | 'categories' | 'departments' | 'sections' | 'semesters');
                       setShowAddForm(false);
                       setEditingItem(null);
                     }}
@@ -369,18 +386,24 @@ const AdminSystemManagement: React.FC = () => {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Category Management</h2>
                   <div className="flex gap-3">
-                    <select
+                    <input
+                      type="text"
                       value={newCategory}
-                      onChange={(e) => setNewCategory(e.target.value as 'Departmental' | 'Open' | 'Humanities')}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      placeholder="Enter category name"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCategory();
+                        }
+                      }}
                       className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
-                    >
-                      <option value="Departmental">Departmental</option>
-                      <option value="Open">Open</option>
-                      <option value="Humanities">Humanities</option>
-                    </select>
+                    />
                     <button
+                      type="button"
                       onClick={handleAddCategory}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+                      disabled={!newCategory.trim()}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:bg-blue-700 active:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
                     >
                       <Plus className="w-4 h-4" />
                       Add Category

@@ -124,7 +124,7 @@ export interface Track {
   careerOutcomes: string[];
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   estimatedHours: number;
-  category: 'Departmental' | 'Open' | 'Humanities';
+  category: string;
 }
 
 export interface StudentElective {
@@ -180,20 +180,23 @@ interface DataContextType {
   tracks: Track[];
   studentElectives: StudentElective[];
   students: Student[];
+  electiveFeedbacks: ElectiveFeedbackForm[];
   getElectivesByCategoryAndDepartment: (category: string, department?: string, semester?: number) => Elective[];
   getStudentElectives: (studentId: string) => StudentElective[];
   selectElective: (studentId: string, electiveId: string, semester: number) => Promise<boolean>;
   removeElective: (studentElectiveId: string) => Promise<boolean>;
-  submitFeedback: (studentElectiveId: string, feedback: any) => Promise<boolean>;
+  submitFeedback: (studentElectiveId: string, feedback: object) => Promise<boolean>;
   getFutureElectives: (currentElectiveId: string) => Elective[];
-  exportDataAsCSV: (dataType: 'students' | 'electives' | 'student-electives', filters?: any) => void;
-  exportDataAsTXT: (dataType: 'students' | 'electives' | 'student-electives', filters?: any) => void;
+  exportDataAsCSV: (dataType: 'students' | 'electives' | 'student-electives') => void;
+  exportDataAsTXT: (dataType: 'students' | 'electives' | 'student-electives') => void;
   getTracksByDepartment: (department: string) => Track[];
-  getTracksByCategory: (category: 'Departmental' | 'Open' | 'Humanities') => Track[];
+  getElectivesByDepartment: (department: string) => Elective[];
+  getTracksByCategory: (category: string) => Track[];
+  getElectivesByCategory: (category: 'Humanities' | 'Departmental' | 'Open Elective') => Elective[];
   addElective: (elective: Omit<Elective, 'id'>) => Promise<boolean>;
   updateElective: (id: string, elective: Partial<Elective>) => Promise<boolean>;
   deleteElective: (id: string) => Promise<boolean>;
-  getRecommendations: (studentId: string) => Elective[];
+  getRecommendations: (studentId: string, semester: number) => Elective[];
   getAvailableDepartments: () => string[];
   getAvailableSections: () => string[];
   getAvailableSemesters: () => number[];
@@ -210,9 +213,9 @@ interface DataContextType {
   addTrack: (track: Omit<Track, 'id'>) => boolean;
   updateTrack: (id: string, updates: Partial<Track>) => boolean;
   removeTrack: (id: string) => boolean;
-  getAvailableCategories: () => ('Departmental' | 'Open' | 'Humanities')[];
-  addCategory: (category: 'Departmental' | 'Open' | 'Humanities') => boolean;
-  removeCategory: (category: 'Departmental' | 'Open' | 'Humanities') => boolean;
+  getAvailableCategories: () => string[];
+  addCategory: (category: string) => boolean;
+  removeCategory: (category: string) => boolean;
   // Alert system functions
   createAlert: (alert: Omit<AlertNotification, 'id' | 'createdAt'>) => void;
   getActiveAlerts: (department?: string, semester?: number) => AlertNotification[];
@@ -849,7 +852,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (storedAdminCategories) {
       setAdminCategories(JSON.parse(storedAdminCategories));
     } else {
-      const defaultCategories: ('Departmental' | 'Open' | 'Humanities')[] = ['Departmental', 'Open', 'Humanities'];
+      const defaultCategories: string[] = ['Departmental', 'Open', 'Humanities'];
       setAdminCategories(defaultCategories);
       localStorage.setItem('adminCategories', JSON.stringify(defaultCategories));
     }
@@ -958,7 +961,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return tracks.filter(d => d.department === department);
   };
 
-  const getTracksByCategory = (category: 'Departmental' | 'Open' | 'Humanities'): Track[] => {
+  const getTracksByCategory = (category: string): Track[] => {
     return tracks.filter(t => t.category === category);
   };
 
@@ -1084,7 +1087,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Admin-configured categories state
-  const [adminCategories, setAdminCategories] = useState<('Departmental' | 'Open' | 'Humanities')[]>([
+  const [adminCategories, setAdminCategories] = useState<string[]>([
     'Departmental', 'Open', 'Humanities'
   ]);
 
@@ -1125,11 +1128,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Category management functions
-  const getAvailableCategories = (): ('Departmental' | 'Open' | 'Humanities')[] => {
+  const getAvailableCategories = (): string[] => {
     return adminCategories;
   };
 
-  const addCategory = (category: 'Departmental' | 'Open' | 'Humanities'): boolean => {
+  const addCategory = (category: string): boolean => {
     if (adminCategories.includes(category)) {
       return false;
     }
@@ -1139,7 +1142,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
-  const removeCategory = (category: 'Departmental' | 'Open' | 'Humanities'): boolean => {
+  const removeCategory = (category: string): boolean => {
     // Check if any tracks or electives are using this category
     const categoryInUse = tracks.some(t => t.category === category) || 
                           electives.some(e => e.category === category);
@@ -1287,7 +1290,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const exportDataAsCSV = (dataType: 'students' | 'electives' | 'student-electives', filters?: any): void => {
+  const exportDataAsCSV = (dataType: 'students' | 'electives' | 'student-electives'): void => {
     let csvContent = '';
     let filename = '';
 
@@ -1328,7 +1331,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.URL.revokeObjectURL(url);
   };
 
-  const exportDataAsTXT = (dataType: 'students' | 'electives' | 'student-electives', filters?: any): void => {
+  const exportDataAsTXT = (dataType: 'students' | 'electives' | 'student-electives'): void => {
     let txtContent = '';
     let filename = '';
 

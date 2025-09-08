@@ -31,7 +31,7 @@ const Navbar: React.FC = () => {
     { path: '/progress', label: 'Progress', icon: BarChart3 },
     { path: '/roadmap', label: 'Roadmap', icon: Map },
     { path: '/profile', label: 'Profile', icon: User },
-    ...(activeFeedbackTemplates.length > 0 ? [{ path: '/feedback', label: 'Feedback', icon: MessageSquare }] : [])
+    { path: '/feedback', label: 'Feedback', icon: MessageSquare }
   ];
 
   const adminNavItems = [

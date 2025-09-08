@@ -13,6 +13,17 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`🌐 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+  if (req.headers.authorization) {
+    console.log('🔑 Authorization header present');
+  } else {
+    console.log('❌ No authorization header');
+  }
+  next();
+});
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI).then(() => {
   console.log('✅ Connected to MongoDB Atlas');
@@ -28,12 +39,21 @@ const userSchema = new mongoose.Schema({
   studentId: String,
   department: String,
   semester: Number,
+  rollNo: String,
+  rollNumber: String,
+  mobile: String,
+  section: String,
   role: { type: String, enum: ['admin', 'student'], default: 'student' },
   profile: {
     year: Number,
     cgpa: Number,
     track: String,
     interests: [String]
+  },
+  preferences: {
+    interests: [String],
+    careerGoals: String,
+    difficulty: String
   },
   createdAt: { type: Date, default: Date.now }
 });
@@ -187,6 +207,112 @@ app.post('/api/auth/register', async (req, res) => {
   } catch (error) {
     console.error('❌ Registration error:', error);
     res.status(500).json({ error: 'Internal server error during registration' });
+  }
+});
+
+// Auth middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret', (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+// Get user profile
+app.get('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 Profile GET request received');
+    console.log('🔧 User from token:', req.user);
+    
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      console.log('❌ User not found with ID:', req.user.userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    console.log('✅ Profile fetched for user:', user.email);
+
+    res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      semester: user.semester,
+      rollNo: user.rollNo,
+      rollNumber: user.rollNumber,
+      mobile: user.mobile,
+      section: user.section,
+      preferences: user.preferences
+    });
+  } catch (error) {
+    console.error('❌ Profile fetch error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update user profile
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 Profile update request received:', req.body);
+    console.log('🔧 User from token:', req.user);
+    
+    const { name, department, semester, rollNo, rollNumber, mobile, section, preferences } = req.body;
+    
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (department !== undefined) updateData.department = department;
+    if (semester !== undefined) updateData.semester = semester;
+    if (rollNo !== undefined) updateData.rollNo = rollNo;
+    if (rollNumber !== undefined) updateData.rollNumber = rollNumber;
+    if (mobile !== undefined) updateData.mobile = mobile;
+    if (section !== undefined) updateData.section = section;
+    if (preferences !== undefined) updateData.preferences = preferences;
+
+    console.log('🔧 Update data:', updateData);
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      console.log('❌ User not found with ID:', req.user.userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    console.log('✅ Profile updated successfully for user:', user.email);
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        semester: user.semester,
+        rollNo: user.rollNo,
+        rollNumber: user.rollNumber,
+        mobile: user.mobile,
+        section: user.section,
+        preferences: user.preferences
+      }
+    });
+  } catch (error) {
+    console.error('❌ Profile update error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

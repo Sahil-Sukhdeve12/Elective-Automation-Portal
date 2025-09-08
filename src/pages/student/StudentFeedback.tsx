@@ -1,28 +1,28 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useData } from '../../contexts/DataContext';
+import { useData, FeedbackQuestion } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { MessageSquare, Send, Star, CheckCircle } from 'lucide-react';
 
 const StudentFeedback: React.FC = () => {
   const { user } = useAuth();
-  const { getActiveFeedbackTemplates } = useData();
+  const { getActiveFeedbackTemplates, submitFeedbackResponse, getStudentSubmittedTemplates } = useData();
   const { addNotification } = useNotifications();
   
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
-  const [responses, setResponses] = useState<Record<string, any>>({});
-  const [submittedTemplates, setSubmittedTemplates] = useState<string[]>([]);
+  const [responses, setResponses] = useState<Record<string, string | number | boolean | string[]>>({});
 
   if (!user || user.role !== 'student') return null;
 
   const feedbackTemplates = getActiveFeedbackTemplates();
+  const submittedTemplates = getStudentSubmittedTemplates(user.id);
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
     setResponses({});
   };
 
-  const handleResponseChange = (questionId: string, value: any) => {
+  const handleResponseChange = (questionId: string, value: string | number | boolean | string[]) => {
     setResponses(prev => ({
       ...prev,
       [questionId]: value
@@ -47,8 +47,23 @@ const StudentFeedback: React.FC = () => {
       return;
     }
 
-    // Simulate submission (in real app, this would go to a backend)
-    setSubmittedTemplates(prev => [...prev, selectedTemplate]);
+    // Submit feedback response
+    const responseData = {
+      templateId: selectedTemplate,
+      templateTitle: template.title,
+      studentId: user.id,
+      studentName: user.name,
+      studentDepartment: user.department,
+      studentSemester: user.semester,
+      responses: template.questions.map(q => ({
+        questionId: q.id,
+        question: q.question,
+        answer: responses[q.id] || '',
+        questionType: q.type
+      }))
+    };
+
+    submitFeedbackResponse(responseData);
     setSelectedTemplate('');
     setResponses({});
     
@@ -59,7 +74,7 @@ const StudentFeedback: React.FC = () => {
     });
   };
 
-  const renderQuestion = (question: any) => {
+  const renderQuestion = (question: FeedbackQuestion) => {
     const value = responses[question.id] || '';
 
     switch (question.type) {
@@ -82,7 +97,8 @@ const StudentFeedback: React.FC = () => {
           </div>
         );
       
-      case 'rating':
+      case 'rating': {
+        const numericValue = typeof value === 'number' ? value : 0;
         return (
           <div className="flex items-center space-x-2">
             {[1, 2, 3, 4, 5].map(rating => (
@@ -90,27 +106,30 @@ const StudentFeedback: React.FC = () => {
                 key={rating}
                 type="button"
                 onClick={() => handleResponseChange(question.id, rating)}
-                className={`p-1 ${value >= rating ? 'text-yellow-500' : 'text-gray-300'}`}
+                className={`p-1 ${numericValue >= rating ? 'text-yellow-500' : 'text-gray-300'}`}
               >
                 <Star className="w-6 h-6 fill-current" />
               </button>
             ))}
             <span className="ml-2 text-sm text-gray-600">
-              {value ? `${value}/5` : 'Select rating'}
+              {numericValue ? `${numericValue}/5` : 'Select rating'}
             </span>
           </div>
         );
+      }
       
-      case 'text':
+      case 'text': {
+        const textValue = typeof value === 'string' ? value : '';
         return (
           <textarea
-            value={value}
+            value={textValue}
             onChange={(e) => handleResponseChange(question.id, e.target.value)}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter your response..."
           />
         );
+      }
       
       case 'yes-no':
         return (

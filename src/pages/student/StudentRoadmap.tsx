@@ -19,16 +19,19 @@ const StudentRoadmap: React.FC = () => {
   const [showSyllabusModal, setShowSyllabusModal] = useState(false);
   const [selectedElectiveForSyllabus, setSelectedElectiveForSyllabus] = useState<any>(null);
 
+  const availableCategories = getAvailableCategories();
+
+  // Set default category if none selected
+  React.useEffect(() => {
+    if (!selectedCategory && availableCategories.length > 0) {
+      setSelectedCategory(availableCategories[0]);
+    }
+  }, [availableCategories, selectedCategory]);
+
   if (!user || user.role !== 'student') return null;
 
   const studentElectives = getStudentElectives(user.id);
   const currentSemester = user.semester || 1;
-  const availableCategories = getAvailableCategories();
-
-  // Set default category if none selected
-  if (!selectedCategory && availableCategories.length > 0) {
-    setSelectedCategory(availableCategories[0]);
-  }
 
   // Handle syllabus viewing
   const handleViewSyllabus = (elective: any) => {
@@ -295,7 +298,7 @@ const StudentRoadmap: React.FC = () => {
               </h2>
               
               {categories.map(category => {
-                const progress = getCategoryProgress(category.id);
+                const progress = getCategoryProgress(category.id as 'Departmental' | 'Humanities' | 'Open');
                 const progressPercentage = (progress.completed / progress.required) * 100;
                 const Icon = category.icon;
                 

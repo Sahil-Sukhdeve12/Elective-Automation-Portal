@@ -163,20 +163,35 @@ router.get('/me', auth, async (req, res) => {
 // Update user profile
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { name, department, semester, preferences, isNewUser } = req.body;
+    const { name, department, semester, preferences, isNewUser, rollNo, rollNumber, section, email, mobile } = req.body;
+    
+    console.log('Profile update request:', { name, department, semester, rollNo, rollNumber, section, email, mobile });
     
     const updateData = {};
     if (name) updateData.name = name;
+    if (email) updateData.email = email;
     if (department) updateData.department = department;
     if (semester) updateData.semester = semester;
+    if (section) updateData.section = section;
+    if (rollNo) updateData.rollNo = rollNo;
+    if (rollNumber) updateData.rollNumber = rollNumber;
+    if (mobile) updateData.mobile = mobile;
     if (preferences) updateData.preferences = preferences;
     if (typeof isNewUser === 'boolean') updateData.isNewUser = isNewUser;
+
+    console.log('Update data prepared:', updateData);
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
       updateData,
       { new: true, runValidators: true }
     );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log('User updated successfully:', user.email);
 
     res.json({
       message: 'Profile updated successfully',
@@ -187,13 +202,17 @@ router.put('/profile', auth, async (req, res) => {
         role: user.role,
         department: user.department,
         semester: user.semester,
+        section: user.section,
+        rollNo: user.rollNo,
+        rollNumber: user.rollNumber,
+        mobile: user.mobile,
         isNewUser: user.isNewUser,
         preferences: user.preferences
       }
     });
   } catch (error) {
     console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', details: error.message });
   }
 });
 

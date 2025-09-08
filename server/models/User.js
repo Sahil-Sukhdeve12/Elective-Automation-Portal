@@ -24,6 +24,18 @@ const userSchema = new mongoose.Schema({
     unique: true,
     sparse: true // Allow multiple null values for admin users
   },
+  rollNo: { // Alternative field name for rollNumber
+    type: String,
+    sparse: true
+  },
+  mobile: {
+    type: String,
+    sparse: true
+  },
+  section: {
+    type: String,
+    sparse: true
+  },
   role: {
     type: String,
     enum: ['student', 'admin'],

@@ -1,5 +1,5 @@
 // API Base URL
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:5000/api' : '/api';
 
 // Types
 export interface User {
@@ -9,6 +9,10 @@ export interface User {
   role: 'student' | 'admin';
   department?: string;
   semester?: number;
+  section?: string;
+  rollNo?: string;
+  rollNumber?: string;
+  mobile?: string;
   isNewUser?: boolean;
   preferences?: {
     interests: string[];
@@ -92,7 +96,7 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('authToken'); // Changed from 'token' to 'authToken'
+  const token = localStorage.getItem('authToken'); // Correct key used by AuthContext
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -150,19 +154,20 @@ export const authApi = {
       body: JSON.stringify(data),
     });
     
-    return handleResponse<User>(response);
+    const result = await handleResponse<{ message: string; user: User }>(response);
+    return result.user; // Extract user from the response object
   },
 
   logout() {
-    localStorage.removeItem('token');
+    localStorage.removeItem('authToken'); // Use consistent key
   },
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('token');
+    return !!localStorage.getItem('authToken'); // Use consistent key
   },
 
   getToken(): string | null {
-    return localStorage.getItem('token');
+    return localStorage.getItem('authToken'); // Use consistent key
   }
 };
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
@@ -6,13 +6,15 @@ import { useData } from '../../contexts/DataContext';
 const StudentRedirect: React.FC = () => {
   const { user, markUserAsExperienced } = useAuth();
   const { getStudentElectives } = useData();
+  const hasMarkedRef = useRef(false);
 
   useEffect(() => {
-    // Mark user as experienced when they access the app
-    if (user?.isNewUser) {
+    // Mark user as experienced when they access the app (only once)
+    if (user?.isNewUser && !hasMarkedRef.current) {
+      hasMarkedRef.current = true;
       markUserAsExperienced();
     }
-  }, [user, markUserAsExperienced]);
+  }, [user?.isNewUser, markUserAsExperienced]);
 
   if (!user || user.role !== 'student') {
     return <Navigate to="/login" replace />;

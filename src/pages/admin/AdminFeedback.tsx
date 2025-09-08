@@ -1,404 +1,350 @@
 import React, { useState } from 'react';
-import { useData, FeedbackTemplate, FeedbackQuestion } from '../../contexts/DataContext';
-import { Plus, Edit2, Trash2, Eye, EyeOff, Save, X } from 'lucide-react';
+import { Plus, FileText, Eye, Trash2 } from 'lucide-react';
+import { useData } from '../../contexts/DataContext';
 
 const AdminFeedback: React.FC = () => {
-  const {
+  const { 
+    getActiveFeedbackTemplates,
+    deleteFeedbackTemplate, 
     createFeedbackTemplate,
-    updateFeedbackTemplate,
-    deleteFeedbackTemplate,
-    getActiveFeedbackTemplates
+    getFeedbackResponses
   } = useData();
-
-  const [isCreating, setIsCreating] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
-  const [templateTitle, setTemplateTitle] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
-  const [templateCategory, setTemplateCategory] = useState<'Departmental' | 'Open' | 'Humanities' | ''>('');
-  const [questions, setQuestions] = useState<FeedbackQuestion[]>([]);
-  const [newQuestion, setNewQuestion] = useState({ 
-    question: '', 
-    type: 'rating' as 'multiple-choice' | 'rating' | 'text' | 'yes-no',
-    options: [] as string[]
+  
+  // Get all templates and responses
+  const feedbackTemplates = getActiveFeedbackTemplates();
+  const feedbackResponses = getFeedbackResponses();
+  
+  const [newTemplate, setNewTemplate] = useState({
+    title: '',
+    description: '',
+    targetCategory: 'Departmental' as 'Departmental' | 'Open' | 'Humanities',
+    isActive: true,
+    createdBy: 'admin',
+    questions: [{ 
+      id: '',
+      question: '', 
+      type: 'text' as 'text' | 'rating' | 'multiple-choice' | 'yes-no', 
+      options: [] as string[],
+      required: true
+    }]
   });
-  const [currentOption, setCurrentOption] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
 
-  // For now, we'll get all templates by calling getActiveFeedbackTemplates without filters
-  // and manage active/inactive state manually
-  const allTemplates = getActiveFeedbackTemplates();
-
-  const resetForm = () => {
-    setTemplateTitle('');
-    setTemplateDescription('');
-    setTemplateCategory('');
-    setQuestions([]);
-    setNewQuestion({ question: '', type: 'rating', options: [] });
-    setCurrentOption('');
-    setIsCreating(false);
-    setEditingTemplate(null);
-  };
-
-  const addOption = () => {
-    if (currentOption.trim() && newQuestion.type === 'multiple-choice') {
-      setNewQuestion(prev => ({
-        ...prev,
-        options: [...prev.options, currentOption.trim()]
-      }));
-      setCurrentOption('');
-    }
-  };
-
-  const removeOption = (index: number) => {
-    setNewQuestion(prev => ({
+  const addQuestion = () => {
+    setNewTemplate(prev => ({
       ...prev,
-      options: prev.options.filter((_, i) => i !== index)
+      questions: [...prev.questions, { 
+        id: `q_${Date.now()}`, 
+        question: '', 
+        type: 'text', 
+        options: [], 
+        required: true 
+      }]
     }));
   };
 
-  const addQuestion = () => {
-    if (newQuestion.question.trim()) {
-      // Validate MCQ has options
-      if (newQuestion.type === 'multiple-choice' && newQuestion.options.length < 2) {
-        alert('Multiple choice questions must have at least 2 options');
-        return;
-      }
-
-      const question: FeedbackQuestion = {
-        id: Date.now().toString(),
-        question: newQuestion.question,
-        type: newQuestion.type,
-        options: newQuestion.type === 'multiple-choice' ? newQuestion.options : undefined,
-        required: true
-      };
-      setQuestions([...questions, question]);
-      setNewQuestion({ question: '', type: 'rating', options: [] });
-      setCurrentOption('');
-    }
+  const updateQuestion = (index: number, field: string, value: string | boolean) => {
+    setNewTemplate(prev => ({
+      ...prev,
+      questions: prev.questions.map((q, i) => 
+        i === index ? { ...q, [field]: value } : q
+      )
+    }));
   };
 
-  const removeQuestion = (questionId: string) => {
-    setQuestions(questions.filter(q => q.id !== questionId));
+  const removeQuestion = (index: number) => {
+    setNewTemplate(prev => ({
+      ...prev,
+      questions: prev.questions.filter((_, i) => i !== index)
+    }));
   };
 
-  const handleCreateTemplate = () => {
-    if (templateTitle.trim() && templateCategory && questions.length > 0) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newTemplate.title.trim() && newTemplate.questions.every(q => q.question.trim())) {
+      // Add IDs to questions if they don't have them
+      const questionsWithIds = newTemplate.questions.map(q => ({
+        ...q,
+        id: q.id || `q_${Date.now()}_${Math.random()}`
+      }));
+
       createFeedbackTemplate({
-        title: templateTitle,
-        description: templateDescription,
-        targetCategory: templateCategory,
-        questions: questions,
+        ...newTemplate,
+        questions: questionsWithIds
+      });
+      
+      setNewTemplate({
+        title: '',
+        description: '',
+        targetCategory: 'Departmental',
         isActive: true,
-        createdBy: 'admin' // This should come from auth context in a real app
+        createdBy: 'admin',
+        questions: [{ id: '', question: '', type: 'text', options: [], required: true }]
       });
-      resetForm();
+      setShowAddForm(false);
     }
   };
 
-  const handleEditTemplate = (template: FeedbackTemplate) => {
-    setEditingTemplate(template.id);
-    setTemplateTitle(template.title);
-    setTemplateDescription(template.description);
-    setTemplateCategory(template.targetCategory || '');
-    setQuestions(template.questions);
-    setIsCreating(true);
-  };
-
-  const handleUpdateTemplate = () => {
-    if (editingTemplate && templateTitle.trim() && templateCategory && questions.length > 0) {
-      updateFeedbackTemplate(editingTemplate, {
-        title: templateTitle,
-        description: templateDescription,
-        targetCategory: templateCategory,
-        questions: questions
-      });
-      resetForm();
-    }
-  };
-
-  const toggleTemplateStatus = (templateId: string, currentStatus: boolean) => {
-    updateFeedbackTemplate(templateId, { isActive: !currentStatus });
-  };
-
-  const handleDeleteTemplate = (templateId: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this feedback template?')) {
-      deleteFeedbackTemplate(templateId);
+      deleteFeedbackTemplate(id);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Feedback Management</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Create and manage feedback templates for student electives
-          </p>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Feedback Management</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Create and manage feedback templates</p>
         </div>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+        >
+          <Plus className="h-5 w-5" />
+          <span>New Template</span>
+        </button>
+      </div>
 
-        {/* Create/Edit Template Form */}
-        {(isCreating || editingTemplate) && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {editingTemplate ? 'Edit Template' : 'Create New Template'}
-              </h2>
-              <button
-                onClick={resetForm}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <FileText className="h-8 w-8 text-blue-500" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Templates</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{feedbackTemplates.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <Eye className="h-8 w-8 text-green-500" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Responses</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{feedbackResponses.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center">
+            <Plus className="h-8 w-8 text-purple-500" />
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Templates</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">{feedbackTemplates.filter(t => t.isActive).length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Template Form */}
+      {showAddForm && (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Create New Feedback Template</h2>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Template Title
+              </label>
+              <input
+                type="text"
+                value={newTemplate.title}
+                onChange={(e) => setNewTemplate(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter template title"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+              </label>
+              <textarea
+                value={newTemplate.description}
+                onChange={(e) => setNewTemplate(prev => ({ ...prev, description: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={3}
+                placeholder="Enter template description"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Category
+              </label>
+              <select
+                value={newTemplate.targetCategory}
+                onChange={(e) => setNewTemplate(prev => ({ ...prev, targetCategory: e.target.value as 'Departmental' | 'Open' | 'Humanities' }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <X className="w-5 h-5" />
+                <option value="Departmental">Departmental</option>
+                <option value="Open">Open</option>
+                <option value="Humanities">Humanities</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Questions
+              </label>
+              <div className="space-y-3">
+                {newTemplate.questions.map((question, index) => (
+                  <div key={index} className="border border-gray-300 dark:border-gray-600 rounded-lg p-3">
+                    <div className="flex space-x-2 mb-2">
+                      <input
+                        type="text"
+                        value={question.question}
+                        onChange={(e) => updateQuestion(index, 'question', e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter question text"
+                        required
+                      />
+                      <select
+                        value={question.type}
+                        onChange={(e) => updateQuestion(index, 'type', e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="text">Text</option>
+                        <option value="rating">Rating</option>
+                        <option value="multiple-choice">Multiple Choice</option>
+                        <option value="yes-no">Yes/No</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={question.required}
+                          onChange={(e) => updateQuestion(index, 'required', e.target.checked)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Required</span>
+                      </label>
+                      {newTemplate.questions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeQuestion(index)}
+                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addQuestion}
+                className="mt-3 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center space-x-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Question</span>
               </button>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Template Name
-                </label>
-                <input
-                  type="text"
-                  value={templateTitle}
-                  onChange={(e) => setTemplateTitle(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="Enter template name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={templateDescription}
-                  onChange={(e) => setTemplateDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  rows={3}
-                  placeholder="Enter template description"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Category
-                </label>
-                <select
-                  value={templateCategory}
-                  onChange={(e) => setTemplateCategory(e.target.value as 'Departmental' | 'Open' | 'Humanities')}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="">Select category</option>
-                  <option value="Departmental">Departmental</option>
-                  <option value="Open">Open</option>
-                  <option value="Humanities">Humanities</option>
-                </select>
-              </div>
-
-              {/* Questions Section */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Questions</h3>
-                
-                {/* Add Question Form */}
-                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4">
-                  <div className="flex gap-4 mb-3">
-                    <input
-                      type="text"
-                      value={newQuestion.question}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
-                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
-                      placeholder="Enter question text"
-                    />
-                    <select
-                      value={newQuestion.type}
-                      onChange={(e) => setNewQuestion({ 
-                        ...newQuestion, 
-                        type: e.target.value as 'multiple-choice' | 'rating' | 'text' | 'yes-no',
-                        options: e.target.value === 'multiple-choice' ? newQuestion.options : []
-                      })}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
-                    >
-                      <option value="rating">Rating</option>
-                      <option value="text">Text</option>
-                      <option value="multiple-choice">Multiple Choice</option>
-                      <option value="yes-no">Yes/No</option>
-                    </select>
-                    <button
-                      onClick={addQuestion}
-                      disabled={!newQuestion.question.trim() || (newQuestion.type === 'multiple-choice' && newQuestion.options.length < 2)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* MCQ Options Section */}
-                  {newQuestion.type === 'multiple-choice' && (
-                    <div className="mt-4 p-3 bg-white dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-500">
-                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Answer Options</h5>
-                      
-                      {/* Add Option */}
-                      <div className="flex gap-2 mb-3">
-                        <input
-                          type="text"
-                          value={currentOption}
-                          onChange={(e) => setCurrentOption(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && addOption()}
-                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                          placeholder="Enter option text"
-                        />
-                        <button
-                          onClick={addOption}
-                          disabled={!currentOption.trim()}
-                          className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
-                        >
-                          Add Option
-                        </button>
-                      </div>
-
-                      {/* Options List */}
-                      <div className="space-y-2">
-                        {newQuestion.options.map((option, index) => (
-                          <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700 rounded border">
-                            <span className="text-sm text-gray-600 dark:text-gray-300 font-medium">
-                              {String.fromCharCode(65 + index)}.
-                            </span>
-                            <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{option}</span>
-                            <button
-                              onClick={() => removeOption(index)}
-                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                        {newQuestion.options.length === 0 && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                            Add at least 2 options for multiple choice questions
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Questions List */}
-                <div className="space-y-2">
-                  {questions.map((question, index) => (
-                    <div key={question.id} className="flex items-center gap-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg">
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Q{index + 1}</span>
-                      <span className="flex-1 text-gray-900 dark:text-white">{question.question}</span>
-                      <span className="text-sm text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-600 rounded">
-                        {question.type}
-                      </span>
-                      <button
-                        onClick={() => removeQuestion(question.id)}
-                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate}
-                  disabled={!templateTitle.trim() || !templateCategory || questions.length === 0}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  {editingTemplate ? 'Update Template' : 'Create Template'}
-                </button>
-                <button
-                  onClick={resetForm}
-                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
+            <div className="flex space-x-3">
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Create Template
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+              >
+                Cancel
+              </button>
             </div>
-          </div>
-        )}
-
-        {/* Create Template Button */}
-        {!isCreating && !editingTemplate && (
-          <div className="mb-8">
-            <button
-              onClick={() => setIsCreating(true)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Create New Template
-            </button>
-          </div>
-        )}
-
-        {/* Templates List */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Feedback Templates</h2>
-          
-          {allTemplates.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-              No feedback templates created yet. Create your first template to get started.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {allTemplates.map((template: FeedbackTemplate) => (
-                <div key={template.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">{template.title}</h3>
-                      <p className="text-gray-600 dark:text-gray-400">{template.description}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                        {template.targetCategory || 'General'}
-                      </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        template.isActive 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                      }`}>
-                        {template.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {template.questions.length} question{template.questions.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditTemplate(template)}
-                      className="px-3 py-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => toggleTemplateStatus(template.id, template.isActive)}
-                      className="px-3 py-1 text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300 flex items-center gap-1"
-                    >
-                      {template.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      {template.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTemplate(template.id)}
-                      className="px-3 py-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          </form>
         </div>
+      )}
+
+      {/* Templates List */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Existing Templates</h2>
+        {feedbackTemplates.length === 0 ? (
+          <div className="text-center py-12">
+            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No templates yet</h3>
+            <p className="text-gray-600 dark:text-gray-400">Create your first feedback template to get started.</p>
+          </div>
+        ) : (
+          feedbackTemplates.map((template) => (
+            <div
+              key={template.id}
+              className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">{template.title}</h3>
+                  {template.description && (
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">{template.description}</p>
+                  )}
+                  <div className="flex items-center mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span>{template.questions.length} questions</span>
+                    <span className="mx-2">•</span>
+                    <span>{template.targetCategory}</span>
+                    <span className="mx-2">•</span>
+                    <span className={template.isActive ? 'text-green-600' : 'text-red-600'}>
+                      {template.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDelete(template.id)}
+                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Questions:</h4>
+                <ul className="space-y-1">
+                  {template.questions.map((question, index) => (
+                    <li key={question.id} className="text-sm text-gray-600 dark:text-gray-400">
+                      {index + 1}. {question.question} ({question.type})
+                      {question.required && <span className="text-red-500 ml-1">*</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))
+        )}
       </div>
+
+      {/* Responses Summary */}
+      {feedbackResponses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Responses</h2>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+            <p className="text-gray-600 dark:text-gray-400">
+              You have {feedbackResponses.length} feedback responses. 
+              <span className="text-blue-600 dark:text-blue-400 ml-1 cursor-pointer hover:underline">
+                View all responses →
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -214,7 +214,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const updateProfile = async (data: Partial<User>): Promise<boolean> => {
     try {
-      if (!user) return false;
+      if (!user) {
+        console.error('No user found for profile update');
+        return false;
+      }
+      
+      console.log('Updating profile with data:', data);
       
       // Call profile update API
       const updatedUser = await authApi.updateProfile(data);
@@ -222,10 +227,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (updatedUser) {
         // Update local user state
         setUser(updatedUser);
-        console.log('Profile updated successfully');
+        console.log('Profile updated successfully:', updatedUser);
         return true;
       }
       
+      console.error('No updated user returned from API');
       return false;
     } catch (error) {
       console.error('Profile update failed:', error);

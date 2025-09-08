@@ -41,6 +41,7 @@ import AdminElectives from './pages/admin/AdminElectives';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminFeedback from './pages/admin/AdminFeedback';
+import AdminAlerts from './pages/admin/AdminAlerts';
 import AdminSystemManagement from './pages/admin/AdminSystemManagement';
 
 // Layout and common components
@@ -209,6 +210,11 @@ function AppRoutes() {
       <Route path="/admin/feedback" element={
         <AdminRoute>
           <AdminFeedback />
+        </AdminRoute>
+      } />
+      <Route path="/admin/alerts" element={
+        <AdminRoute>
+          <AdminAlerts />
         </AdminRoute>
       } />
       <Route path="/admin/system" element={

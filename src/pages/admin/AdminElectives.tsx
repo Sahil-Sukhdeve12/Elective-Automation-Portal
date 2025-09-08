@@ -11,6 +11,7 @@ const AdminElectives: React.FC = () => {
     addElective, 
     updateElective, 
     deleteElective, 
+    refreshElectives,
     getAvailableDepartments,
     getAvailableSemesters 
   } = useData();
@@ -23,13 +24,14 @@ const AdminElectives: React.FC = () => {
     name: '',
     code: '',
     semester: 5,
-    track: '',
+    track: 'General',
     description: '',
     credits: 3,
     prerequisites: [] as string[],
     department: '',
     category: 'Theory' as 'Theory' | 'Practical',
     electiveCategory: 'Departmental' as 'Humanities' | 'Departmental' | 'Open',
+    subjectType: 'Theory' as 'Theory' | 'Practical' | 'Theory+Practical',
     // New fields for Open electives
     offeredBy: '',
     eligibleDepartments: [] as string[],
@@ -74,6 +76,7 @@ const AdminElectives: React.FC = () => {
         department: elective.department || '',
         category: 'Theory',
         electiveCategory: elective.category as 'Humanities' | 'Departmental' | 'Open',
+        subjectType: elective.subjectType || 'Theory',
         offeredBy: elective.offeredBy || '',
         eligibleDepartments: elective.eligibleDepartments || [],
         infoImage: elective.image || '',
@@ -88,13 +91,14 @@ const AdminElectives: React.FC = () => {
         name: '',
         code: '',
         semester: 5,
-        track: '',
+        track: 'General',
         description: '',
         credits: 3,
         prerequisites: [],
         department: '',
         category: 'Theory',
         electiveCategory: 'Departmental',
+        subjectType: 'Theory',
         offeredBy: '',
         eligibleDepartments: [],
         infoImage: '',
@@ -112,8 +116,18 @@ const AdminElectives: React.FC = () => {
     setEditingElective(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Basic validation
+    if (!formData.name || !formData.code || !formData.track || !formData.description || !formData.department) {
+      addNotification({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please fill in all required fields (Name, Code, Track, Description, Department).'
+      });
+      return;
+    }
     
     // Validate Open elective fields
     if (formData.electiveCategory === 'Open') {
@@ -148,6 +162,7 @@ const AdminElectives: React.FC = () => {
       department: formData.department,
       category: formData.electiveCategory as 'Departmental' | 'Humanities' | 'Open',
       electiveCategory: 'Elective' as const,
+      subjectType: formData.subjectType,
       // Include new multi-department fields for Open electives
       ...(formData.electiveCategory === 'Open' && {
         offeredBy: formData.offeredBy,
@@ -157,20 +172,44 @@ const AdminElectives: React.FC = () => {
       selectionDeadline: formData.selectionDeadline || undefined, // Include the deadline
     };
     
+    let success = false;
     if (editingElective) {
-      updateElective(editingElective.id, electiveData);
-      addNotification({
-        type: 'success',
-        title: 'Elective Updated',
-        message: `${formData.name} has been updated successfully.`
-      });
+      success = await updateElective(editingElective.id, electiveData);
+      if (success) {
+        addNotification({
+          type: 'success',
+          title: 'Elective Updated',
+          message: `${formData.name} has been updated successfully.`
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Update Failed',
+          message: `Failed to update ${formData.name}. Please try again.`
+        });
+        return;
+      }
     } else {
-      addElective(electiveData);
-      addNotification({
-        type: 'success',
-        title: 'Elective Added',
-        message: `${formData.name} has been added successfully.`
-      });
+      success = await addElective(electiveData);
+      if (success) {
+        addNotification({
+          type: 'success',
+          title: 'Elective Added',
+          message: `${formData.name} has been added successfully.`
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Add Failed',
+          message: `Failed to add ${formData.name}. Please try again.`
+        });
+        return;
+      }
+    }
+    
+    // Refresh the electives list after successful add/update
+    if (success) {
+      await refreshElectives();
     }
     
     handleCloseModal();
@@ -298,7 +337,14 @@ const AdminElectives: React.FC = () => {
 
       <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
         <span>{elective.credits} Credits</span>
-        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{elective.electiveCategory}</span>
+        <div className="flex gap-2">
+          {elective.subjectType && (
+            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+              {elective.subjectType}
+            </span>
+          )}
+          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{elective.electiveCategory}</span>
+        </div>
       </div>
 
       <div className="flex space-x-2">
@@ -330,6 +376,22 @@ const AdminElectives: React.FC = () => {
           </p>
         </div>
         <div className="flex space-x-3">
+          <button
+            onClick={async () => {
+              await refreshElectives();
+              addNotification({
+                type: 'success',
+                title: 'Refreshed',
+                message: 'Electives list has been refreshed'
+              });
+            }}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
           <button
             onClick={() => handleOpenModal()}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"
@@ -498,6 +560,23 @@ const AdminElectives: React.FC = () => {
                     <option value="Departmental">Departmental</option>
                     <option value="Humanities">Humanities</option>
                     <option value="Open">Open</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject Type *
+                  </label>
+                  <select
+                    name="subjectType"
+                    value={formData.subjectType}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="Theory">Theory</option>
+                    <option value="Practical">Practical</option>
+                    <option value="Theory+Practical">Theory + Practical</option>
                   </select>
                 </div>
 

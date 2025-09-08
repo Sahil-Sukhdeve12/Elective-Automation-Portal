@@ -23,12 +23,37 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+// API Base URL helper
+const getApiBaseUrl = () => {
+  return import.meta.env.DEV ? 'http://localhost:5000/api' : '/api';
+};
+
 // API functions to fetch data from backend
 const fetchElectives = async () => {
   try {
-    const response = await fetch('/api/electives');
+    console.log('Fetching electives from API...');
+    const response = await fetch(`${getApiBaseUrl()}/electives`);
+    console.log('Fetch response status:', response.status);
+    
+    if (!response.ok) {
+      console.error('Fetch failed with status:', response.status);
+      return [];
+    }
+    
     const data = await response.json();
-    return data.electives || [];
+    console.log('Raw electives from API:', data);
+    
+    // Handle both old format (array) and new format (object with electives property)
+    const electives = Array.isArray(data) ? data : (data.electives || []);
+    
+    // Map MongoDB _id to id for frontend compatibility
+    const mappedElectives = electives.map((elective: any) => ({
+      ...elective,
+      id: elective._id || elective.id
+    }));
+    
+    console.log('Mapped electives:', mappedElectives);
+    return mappedElectives;
   } catch (error) {
     console.error('Error fetching electives:', error);
     return [];
@@ -37,11 +62,29 @@ const fetchElectives = async () => {
 
 const fetchUsers = async () => {
   try {
-    const response = await fetch('/api/users');
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      console.warn('No auth token found, skipping users fetch');
+      return [];
+    }
+    
+    const response = await fetch(`${getApiBaseUrl()}/users`, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    
+    if (!response.ok) {
+      console.warn('Fetch users failed with status:', response.status);
+      return [];
+    }
+    
     const data = await response.json();
+    console.log('✅ Users fetched successfully:', data.users?.length || 0);
     return data.users || [];
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.warn('Error fetching users (non-critical):', error instanceof Error ? error.message : 'Unknown error');
     return [];
   }
 };
@@ -72,6 +115,7 @@ export interface Elective {
   description: string;
   category: 'Departmental' | 'Open' | 'Humanities';
   electiveCategory: 'Core' | 'Elective' | 'Lab';
+  subjectType?: 'Theory' | 'Practical' | 'Theory+Practical'; // Type of subject
   department: string;
   // For Open Category electives
   offeredBy?: string; // Which department offers this elective
@@ -114,6 +158,24 @@ export interface FeedbackQuestion {
   type: 'multiple-choice' | 'rating' | 'text' | 'yes-no';
   options?: string[]; // For multiple-choice questions
   required: boolean;
+}
+
+export interface FeedbackResponse {
+  id: string;
+  templateId: string;
+  templateTitle: string;
+  studentId: string;
+  studentName: string;
+  studentDepartment?: string;
+  studentSemester?: number;
+  responses: {
+    questionId: string;
+    question: string;
+    answer: any;
+    questionType: 'multiple-choice' | 'rating' | 'text' | 'yes-no';
+  }[];
+  submittedAt: Date;
+  electiveId?: string; // If feedback is specific to an elective
 }
 
 export interface Track {
@@ -191,6 +253,8 @@ interface DataContextType {
   submitFeedback: (studentElectiveId: string, feedback: object) => Promise<boolean>;
   getFutureElectives: (currentElectiveId: string) => Elective[];
   exportDataAsCSV: (dataType: 'students' | 'electives' | 'student-electives') => void;
+  exportDataAsExcel: () => void;
+  exportDataAsPDF: () => void;
   exportDataAsTXT: (dataType: 'students' | 'electives' | 'student-electives') => void;
   getTracksByDepartment: (department: string) => Track[];
   getElectivesByDepartment: (department: string) => Elective[];
@@ -199,7 +263,9 @@ interface DataContextType {
   addElective: (elective: Omit<Elective, 'id'>) => Promise<boolean>;
   updateElective: (id: string, elective: Partial<Elective>) => Promise<boolean>;
   deleteElective: (id: string) => Promise<boolean>;
+  refreshElectives: () => Promise<boolean>;
   getRecommendations: (studentId: string, semester: number) => Elective[];
+  getElectiveRecommendation: (studentId: string, userPreferences: { interests: string[]; careerGoals: string; difficulty: string }) => Elective[];
   getAvailableDepartments: () => string[];
   getAvailableSections: () => string[];
   getAvailableSemesters: () => number[];
@@ -228,12 +294,20 @@ interface DataContextType {
   updateFeedbackTemplate: (templateId: string, updates: Partial<FeedbackTemplate>) => void;
   deleteFeedbackTemplate: (templateId: string) => void;
   getActiveFeedbackTemplates: (category?: string) => FeedbackTemplate[];
+  // Feedback response functions
+  submitFeedbackResponse: (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>) => void;
+  getFeedbackResponses: (templateId?: string, studentId?: string) => FeedbackResponse[];
+  getStudentSubmittedTemplates: (studentId: string) => string[];
+  deleteFeedbackResponse: (responseId: string) => void;
   // Syllabus management functions
   uploadSyllabus: (electiveId: string, file: File, description: string) => Promise<boolean>;
   getSyllabus: (electiveId: string) => Syllabus | null;
   getAllSyllabi: () => Syllabus[];
   updateSyllabus: (syllabusId: string, updates: Partial<Syllabus>) => Promise<boolean>;
   deleteSyllabus: (syllabusId: string) => Promise<boolean>;
+  setElectiveDeadline: (electiveId: string, deadline: string) => void;
+  getElectiveDeadline: (electiveId: string) => string | null;
+  addElectiveFeedback: (feedback: Omit<ElectiveFeedbackForm, 'id'>) => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -750,6 +824,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Alert and feedback system
   const [alertNotifications, setAlertNotifications] = useState<AlertNotification[]>([]);
   const [feedbackTemplates, setFeedbackTemplates] = useState<FeedbackTemplate[]>([]);
+  const [feedbackResponses, setFeedbackResponses] = useState<FeedbackResponse[]>([]);
   
   // Syllabus management
   const [syllabi, setSyllabi] = useState<Syllabus[]>([]);
@@ -828,6 +903,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initialize alert and feedback data
     const storedAlerts = localStorage.getItem('alertNotifications');
     const storedFeedbackTemplates = localStorage.getItem('feedbackTemplates');
+    const storedFeedbackResponses = localStorage.getItem('feedbackResponses');
     const storedSyllabi = localStorage.getItem('syllabi');
 
     if (storedStudentElectives) {
@@ -876,6 +952,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setFeedbackTemplates(JSON.parse(storedFeedbackTemplates));
     }
     
+    if (storedFeedbackResponses) {
+      const parsedResponses = JSON.parse(storedFeedbackResponses).map((response: any) => ({
+        ...response,
+        submittedAt: new Date(response.submittedAt)
+      }));
+      setFeedbackResponses(parsedResponses);
+    }
+    
     if (storedSyllabi) {
       const parsedSyllabi = JSON.parse(storedSyllabi).map((syllabus: any) => ({
         ...syllabus,
@@ -886,23 +970,141 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const addElective = async (elective: Omit<Elective, 'id'>): Promise<boolean> => {
-    const newElective = {
-      ...elective,
-      id: Date.now().toString()
-    };
-    const updatedElectives = [...electives, newElective];
-    setElectives(updatedElectives);
-    localStorage.setItem('electives', JSON.stringify(updatedElectives));
-    return true;
+    try {
+      console.log('Adding elective:', elective);
+      
+      // Save to database via API
+      const response = await fetch(`${getApiBaseUrl()}/electives`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify(elective)
+      });
+      
+      console.log('API response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('API response data:', data);
+        
+        const newElective = {
+          ...data.elective,
+          id: data.elective._id || data.elective.id
+        };
+        
+        console.log('Mapped elective:', newElective);
+        
+        // Update local state
+        const updatedElectives = [...electives, newElective];
+        setElectives(updatedElectives);
+        localStorage.setItem('electives', JSON.stringify(updatedElectives));
+        
+        // Refresh data from backend to ensure consistency
+        setTimeout(async () => {
+          console.log('Refreshing electives...');
+          const refreshedElectives = await fetchElectives();
+          console.log('Refreshed electives:', refreshedElectives);
+          if (refreshedElectives.length > 0) {
+            setElectives(refreshedElectives);
+            localStorage.setItem('electives', JSON.stringify(refreshedElectives));
+          }
+        }, 1000);
+        
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to save elective to database:', errorData);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error adding elective:', error);
+      // Fallback to local storage only
+      const newElective = {
+        ...elective,
+        id: Date.now().toString()
+      };
+      const updatedElectives = [...electives, newElective];
+      setElectives(updatedElectives);
+      localStorage.setItem('electives', JSON.stringify(updatedElectives));
+      return true;
+    }
   };
 
   const updateElective = async (id: string, updates: Partial<Elective>): Promise<boolean> => {
-    const updatedElectives = electives.map(e => 
-      e.id === id ? { ...e, ...updates } : e
-    );
-    setElectives(updatedElectives);
-    localStorage.setItem('electives', JSON.stringify(updatedElectives));
-    return true;
+    try {
+      // Update in database via API
+      const response = await fetch(`/api/electives/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify(updates)
+      });
+      
+      if (response.ok) {
+        // Update local state
+        const updatedElectives = electives.map(e => 
+          e.id === id ? { ...e, ...updates } : e
+        );
+        setElectives(updatedElectives);
+        localStorage.setItem('electives', JSON.stringify(updatedElectives));
+        return true;
+      } else {
+        console.error('Failed to update elective in database');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error updating elective:', error);
+      // Fallback to local storage only
+      const updatedElectives = electives.map(e => 
+        e.id === id ? { ...e, ...updates } : e
+      );
+      setElectives(updatedElectives);
+      localStorage.setItem('electives', JSON.stringify(updatedElectives));
+      return true;
+    }
+  };
+
+  const removeElective = async (studentElectiveId: string): Promise<boolean> => {
+    try {
+      // Remove from student electives
+      const updatedStudentElectives = studentElectives.filter(se => se.id !== studentElectiveId);
+      setStudentElectives(updatedStudentElectives);
+      localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
+      return true;
+    } catch (error) {
+      console.error('Error removing elective:', error);
+      return false;
+    }
+  };
+
+  const submitFeedback = async (studentElectiveId: string, feedback: object): Promise<boolean> => {
+    try {
+      // Update the student elective with feedback
+      const updatedStudentElectives = studentElectives.map(se => 
+        se.id === studentElectiveId 
+          ? { 
+              ...se, 
+              feedback: {
+                rating: (feedback as any).rating || se.feedback?.rating || 0,
+                comment: (feedback as any).comment || se.feedback?.comment || '',
+                difficulty: (feedback as any).difficulty || se.feedback?.difficulty || 'medium',
+                recommendation: (feedback as any).recommendation || se.feedback?.recommendation || false
+              }, 
+              feedbackSubmitted: true 
+            }
+          : se
+      );
+      setStudentElectives(updatedStudentElectives);
+      localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
+      return true;
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      return false;
+    }
   };
 
   const deleteElective = async (id: string): Promise<boolean> => {
@@ -1511,6 +1713,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  // Feedback response functions
+  const submitFeedbackResponse = (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>): void => {
+    const newResponse: FeedbackResponse = {
+      ...response,
+      id: Date.now().toString(),
+      submittedAt: new Date()
+    };
+    
+    const updatedResponses = [...feedbackResponses, newResponse];
+    setFeedbackResponses(updatedResponses);
+    localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+  };
+
+  const getFeedbackResponses = (templateId?: string, studentId?: string): FeedbackResponse[] => {
+    return feedbackResponses.filter(response => {
+      if (templateId && response.templateId !== templateId) return false;
+      if (studentId && response.studentId !== studentId) return false;
+      return true;
+    });
+  };
+
+  const getStudentSubmittedTemplates = (studentId: string): string[] => {
+    return feedbackResponses
+      .filter(response => response.studentId === studentId)
+      .map(response => response.templateId);
+  };
+
+  const deleteFeedbackResponse = (responseId: string): void => {
+    const updatedResponses = feedbackResponses.filter(response => response.id !== responseId);
+    setFeedbackResponses(updatedResponses);
+    localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+  };
+
   // Get current enrollment count for an elective
   const getElectiveEnrollmentCount = (electiveId: string): number => {
     return studentElectives.filter(se => se.electiveId === electiveId).length;
@@ -1599,6 +1834,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshElectives = async (): Promise<boolean> => {
+    try {
+      const refreshedElectives = await fetchElectives();
+      if (refreshedElectives.length >= 0) {
+        setElectives(refreshedElectives);
+        localStorage.setItem('electives', JSON.stringify(refreshedElectives));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error refreshing electives:', error);
+      return false;
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       electives,
@@ -1609,6 +1859,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addElective,
       updateElective,
       deleteElective,
+      removeElective,
+      submitFeedback,
+      refreshElectives,
       selectElective,
       getStudentElectives,
       getRecommendations,
@@ -1654,6 +1907,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       updateFeedbackTemplate,
       deleteFeedbackTemplate,
       getActiveFeedbackTemplates,
+      // Feedback response functions
+      submitFeedbackResponse,
+      getFeedbackResponses,
+      getStudentSubmittedTemplates,
+      deleteFeedbackResponse,
       // Syllabus management functions
       uploadSyllabus,
       getSyllabus,

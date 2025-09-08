@@ -422,11 +422,18 @@ const StudentElectiveSelection: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2 mb-2">
                         <p className="text-sm text-gray-600 dark:text-gray-300">{elective.code} • {elective.credits} Credits</p>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                          elective.electiveCategory === 'Lab' ? 'bg-orange-500' : 'bg-blue-500'
-                        }`}>
-                          {elective.electiveCategory}
-                        </span>
+                        <div className="flex gap-1">
+                          {elective.subjectType && (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium text-white bg-purple-500">
+                              {elective.subjectType}
+                            </span>
+                          )}
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                            elective.electiveCategory === 'Lab' ? 'bg-orange-500' : 'bg-blue-500'
+                          }`}>
+                            {elective.electiveCategory}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${getTrackColor(elective.track)}`}>

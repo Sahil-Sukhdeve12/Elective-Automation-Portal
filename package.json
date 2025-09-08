@@ -16,8 +16,11 @@
     "seed": "node server/seed.js",
     "export-users": "node server/export-users.js",
     "view-users": "node view-users.cjs",
-    "start": "npm run build && npm run server",
-    "vercel-build": "npm run build"
+    "start": "node universal-server.js",
+    "start:local": "npm run build && npm run server",
+    "vercel-build": "npm run build",
+    "render:build": "npm install && npm run build",
+    "railway:start": "node universal-server.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

@@ -216,6 +216,9 @@ function AppRoutes() {
           <AdminSystemManagement />
         </AdminRoute>
       } />
+      
+      {/* Catch-all route - redirect any unknown URLs to login page */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }

@@ -271,6 +271,16 @@ app.get('/api/electives', async (req, res) => {
   }
 });
 
+// Handle 404 errors - serve React app for client-side routing
+app.use((req, res, next) => {
+  // Only serve React app for non-API routes
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  } else {
+    res.status(404).json({ error: 'API endpoint not found' });
+  }
+});
+
 // ================================
 // START SERVER
 // ================================

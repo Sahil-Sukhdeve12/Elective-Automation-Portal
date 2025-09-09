@@ -212,7 +212,16 @@ router.put('/profile', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Internal server error', details: error.message });
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message,
+      type: error.name 
+    });
   }
 });
 

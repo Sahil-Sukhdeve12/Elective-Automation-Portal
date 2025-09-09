@@ -321,492 +321,492 @@ export const useData = () => {
 };
 
 const initialTracks: Track[] = [
-  {
-    id: '1',
-    name: 'Data Science & Analytics',
-    department: 'Computer Science',
-    description: 'Advanced analytics, machine learning, and data visualization techniques',
-    color: '#4F46E5',
-    suggestedElectives: ['cs301', 'cs302'],
-    prerequisites: ['Programming Fundamentals', 'Statistics'],
-    careerOutcomes: ['Data Scientist', 'ML Engineer', 'Business Analyst'],
-    difficulty: 'Advanced',
-    estimatedHours: 120,
-    category: 'Departmental'
-  },
-  {
-    id: '2',
-    name: 'Cybersecurity',
-    department: 'Computer Science',
-    description: 'Network security, ethical hacking, and information security management',
-    color: '#DC2626',
-    suggestedElectives: ['cs303', 'cs304'],
-    prerequisites: ['Computer Networks', 'Operating Systems'],
-    careerOutcomes: ['Security Analyst', 'Ethical Hacker', 'Security Consultant'],
-    difficulty: 'Advanced',
-    estimatedHours: 100,
-    category: 'Departmental'
-  },
-  {
-    id: '3',
-    name: 'Web Development',
-    department: 'Computer Science',
-    description: 'Full-stack web development with modern frameworks',
-    color: '#059669',
-    suggestedElectives: ['cs305', 'cs306'],
-    prerequisites: ['Programming Fundamentals', 'Database Systems'],
-    careerOutcomes: ['Full Stack Developer', 'Frontend Developer', 'Backend Developer'],
-    difficulty: 'Intermediate',
-    estimatedHours: 80,
-    category: 'Open'
-  },
-  {
-    id: '4',
-    name: 'Power Systems',
-    department: 'Electrical Engineering',
-    description: 'Advanced power generation, transmission, and distribution systems',
-    color: '#7C2D12',
-    suggestedElectives: ['ee301', 'ee302'],
-    prerequisites: ['Circuit Analysis', 'Electromagnetic Fields'],
-    careerOutcomes: ['Power Engineer', 'Grid Analyst', 'Renewable Energy Specialist'],
-    difficulty: 'Advanced',
-    estimatedHours: 110,
-    category: 'Departmental'
-  },
-  {
-    id: '5',
-    name: 'Digital Signal Processing',
-    department: 'Electrical Engineering',
-    description: 'Digital filter design, signal analysis, and processing techniques',
-    color: '#1E40AF',
-    suggestedElectives: ['ee303', 'ee304'],
-    prerequisites: ['Signals and Systems', 'Mathematics'],
-    careerOutcomes: ['DSP Engineer', 'Audio Engineer', 'Communications Engineer'],
-    difficulty: 'Advanced',
-    estimatedHours: 90,
-    category: 'Departmental'
-  },
-  {
-    id: '6',
-    name: 'Communication & Leadership',
-    department: 'Humanities',
-    description: 'Developing effective communication and leadership skills',
-    color: '#7C3AED',
-    suggestedElectives: ['hum301', 'hum302'],
-    prerequisites: ['Basic Communication'],
-    careerOutcomes: ['Team Leader', 'Project Manager', 'Communications Specialist'],
-    difficulty: 'Intermediate',
-    estimatedHours: 60,
-    category: 'Humanities'
-  },
-  {
-    id: '7',
-    name: 'Philosophy & Ethics',
-    department: 'Humanities',
-    description: 'Exploring ethical frameworks and philosophical thinking',
-    color: '#DB2777',
-    suggestedElectives: ['hum303', 'hum304'],
-    prerequisites: ['Introduction to Philosophy'],
-    careerOutcomes: ['Ethics Consultant', 'Policy Analyst', 'Academic Researcher'],
-    difficulty: 'Intermediate',
-    estimatedHours: 55,
-    category: 'Humanities'
-  }
+  // {
+  //   id: '1',
+  //   name: 'Data Science & Analytics',
+  //   department: 'Computer Science',
+  //   description: 'Advanced analytics, machine learning, and data visualization techniques',
+  //   color: '#4F46E5',
+  //   suggestedElectives: ['cs301', 'cs302'],
+  //   prerequisites: ['Programming Fundamentals', 'Statistics'],
+  //   careerOutcomes: ['Data Scientist', 'ML Engineer', 'Business Analyst'],
+  //   difficulty: 'Advanced',
+  //   estimatedHours: 120,
+  //   category: 'Departmental'
+  // },
+  // {
+  //   id: '2',
+  //   name: 'Cybersecurity',
+  //   department: 'Computer Science',
+  //   description: 'Network security, ethical hacking, and information security management',
+  //   color: '#DC2626',
+  //   suggestedElectives: ['cs303', 'cs304'],
+  //   prerequisites: ['Computer Networks', 'Operating Systems'],
+  //   careerOutcomes: ['Security Analyst', 'Ethical Hacker', 'Security Consultant'],
+  //   difficulty: 'Advanced',
+  //   estimatedHours: 100,
+  //   category: 'Departmental'
+  // },
+  // {
+  //   id: '3',
+  //   name: 'Web Development',
+  //   department: 'Computer Science',
+  //   description: 'Full-stack web development with modern frameworks',
+  //   color: '#059669',
+  //   suggestedElectives: ['cs305', 'cs306'],
+  //   prerequisites: ['Programming Fundamentals', 'Database Systems'],
+  //   careerOutcomes: ['Full Stack Developer', 'Frontend Developer', 'Backend Developer'],
+  //   difficulty: 'Intermediate',
+  //   estimatedHours: 80,
+  //   category: 'Open'
+  // },
+  // {
+  //   id: '4',
+  //   name: 'Power Systems',
+  //   department: 'Electrical Engineering',
+  //   description: 'Advanced power generation, transmission, and distribution systems',
+  //   color: '#7C2D12',
+  //   suggestedElectives: ['ee301', 'ee302'],
+  //   prerequisites: ['Circuit Analysis', 'Electromagnetic Fields'],
+  //   careerOutcomes: ['Power Engineer', 'Grid Analyst', 'Renewable Energy Specialist'],
+  //   difficulty: 'Advanced',
+  //   estimatedHours: 110,
+  //   category: 'Departmental'
+  // },
+  // {
+  //   id: '5',
+  //   name: 'Digital Signal Processing',
+  //   department: 'Electrical Engineering',
+  //   description: 'Digital filter design, signal analysis, and processing techniques',
+  //   color: '#1E40AF',
+  //   suggestedElectives: ['ee303', 'ee304'],
+  //   prerequisites: ['Signals and Systems', 'Mathematics'],
+  //   careerOutcomes: ['DSP Engineer', 'Audio Engineer', 'Communications Engineer'],
+  //   difficulty: 'Advanced',
+  //   estimatedHours: 90,
+  //   category: 'Departmental'
+  // },
+  // {
+  //   id: '6',
+  //   name: 'Communication & Leadership',
+  //   department: 'Humanities',
+  //   description: 'Developing effective communication and leadership skills',
+  //   color: '#7C3AED',
+  //   suggestedElectives: ['hum301', 'hum302'],
+  //   prerequisites: ['Basic Communication'],
+  //   careerOutcomes: ['Team Leader', 'Project Manager', 'Communications Specialist'],
+  //   difficulty: 'Intermediate',
+  //   estimatedHours: 60,
+  //   category: 'Humanities'
+  // },
+  // {
+  //   id: '7',
+  //   name: 'Philosophy & Ethics',
+  //   department: 'Humanities',
+  //   description: 'Exploring ethical frameworks and philosophical thinking',
+  //   color: '#DB2777',
+  //   suggestedElectives: ['hum303', 'hum304'],
+  //   prerequisites: ['Introduction to Philosophy'],
+  //   careerOutcomes: ['Ethics Consultant', 'Policy Analyst', 'Academic Researcher'],
+  //   difficulty: 'Intermediate',
+  //   estimatedHours: 55,
+  //   category: 'Humanities'
+  // }
 ];
 
 const initialElectives: Elective[] = [
   // AI Track - Computer Science & Engineering (Departmental Electives)
-  {
-    id: '1',
-    name: 'Machine Learning Fundamentals',
-    code: 'CS501',
-    semester: 5,
-    track: 'Data Science & Analytics',
-    description: 'Introduction to supervised and unsupervised learning algorithms',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop&crop=center',
-    selectionDeadline: '2025-12-31T23:59:59.000Z'
-  },
-  {
-    id: '2',
-    name: 'Deep Learning',
-    code: 'CS502',
-    semester: 6,
-    track: 'Data Science & Analytics',
-    description: 'Neural networks, CNNs, RNNs and their applications',
-    prerequisites: ['1'],
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1507146426996-ef05306b995a?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '3',
-    name: 'Natural Language Processing',
-    code: 'CS503',
-    semester: 7,
-    track: 'Data Science & Analytics',
-    description: 'Text processing, sentiment analysis, and language models',
-    prerequisites: ['1'],
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1526378800651-c32d170fe6f8?w=400&h=300&fit=crop&crop=center'
-  },
-  // Cybersecurity Track - Computer Science & Engineering (Departmental Electives)
-  {
-    id: '4',
-    name: 'Network Security',
-    code: 'CS504',
-    semester: 5,
-    track: 'Cybersecurity',
-    description: 'Firewalls, intrusion detection, and network protocols',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '5',
-    name: 'Ethical Hacking',
-    code: 'CS505',
-    semester: 6,
-    track: 'Cybersecurity',
-    description: 'Penetration testing, vulnerability assessment',
-    prerequisites: ['4'],
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '6',
-    name: 'Cryptography',
-    code: 'CS506',
-    semester: 7,
-    track: 'Cybersecurity',
-    description: 'Encryption algorithms, digital signatures, blockchain',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1614064643087-96ce79ad4c25?w=400&h=300&fit=crop&crop=center'
-  },
-  // Data Science Track - Computer Science & Engineering (Departmental Electives)
-  {
-    id: '7',
-    name: 'Big Data Analytics',
-    code: 'CS507',
-    semester: 5,
-    track: 'Data Science',
-    description: 'Hadoop, Spark, and distributed computing',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '8',
-    name: 'Data Visualization',
-    code: 'CS508',
-    semester: 6,
-    track: 'Data Science',
-    description: 'Interactive dashboards and visual storytelling',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '9',
-    name: 'Statistical Learning',
-    code: 'CS509',
-    semester: 7,
-    track: 'Data Science',
-    description: 'Statistical models and hypothesis testing',
-    prerequisites: ['7'],
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop&crop=center'
-  },
-  // Web Development Track - Computer Science & Engineering (Departmental Electives)
-  {
-    id: '10',
-    name: 'Full Stack Development',
-    code: 'CS510',
-    semester: 5,
-    track: 'Web Development',
-    description: 'MERN/MEAN stack development and deployment',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '11',
-    name: 'Cloud Computing',
-    code: 'CS511',
-    semester: 6,
-    track: 'Web Development',
-    description: 'AWS, Azure, and cloud architecture patterns',
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '12',
-    name: 'Mobile Development',
-    code: 'CS512',
-    semester: 7,
-    track: 'Web Development',
-    description: 'React Native, Flutter, and cross-platform development',
-    prerequisites: ['10'],
-    credits: 3,
-    department: 'Computer Science & Engineering',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop&crop=center'
-  },
-  // Digital Signal Processing Track - Electronics & Communication (Departmental Electives)
-  {
-    id: '13',
-    name: 'Advanced Signal Processing',
-    code: 'EC501',
-    semester: 5,
-    track: 'Digital Signal Processing',
-    description: 'Digital filters, transforms, and signal analysis',
-    credits: 3,
-    department: 'Electronics & Communication',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '14',
-    name: 'Communication Systems',
-    code: 'EC502',
-    semester: 6,
-    track: 'Digital Signal Processing',
-    description: 'Modulation, coding, and wireless communication',
-    credits: 3,
-    department: 'Electronics & Communication',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1476357471311-43c0db9fb2b4?w=400&h=300&fit=crop&crop=center'
-  },
-  {
-    id: '15',
-    name: 'Image Processing',
-    code: 'EC503',
-    semester: 7,
-    track: 'Digital Signal Processing',
-    description: 'Digital image enhancement and computer vision',
-    prerequisites: ['13'],
-    credits: 3,
-    department: 'Electronics & Communication',
-    category: 'Departmental',
-    electiveCategory: 'Elective',
-    image: 'https://images.unsplash.com/photo-1518709594023-6eab9bab7b23?w=400&h=300&fit=crop&crop=center'
-  },
-  // VLSI Design Track - Electronics & Communication (Departmental Electives)
-  {
-    id: '16',
-    name: 'VLSI Circuit Design',
-    code: 'EC504',
-    semester: 5,
-    track: 'VLSI Design',
-    description: 'CMOS circuit design and layout optimization',
-    credits: 3,
-    department: 'Electronics & Communication',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '17',
-    name: 'System-on-Chip Design',
-    code: 'EC505',
-    semester: 6,
-    track: 'VLSI Design',
-    description: 'SoC architecture and design methodology',
-    prerequisites: ['16'],
-    credits: 3,
-    department: 'Electronics & Communication',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '18',
-    name: 'FPGA Programming',
-    code: 'EC506',
-    semester: 7,
-    track: 'VLSI Design',
-    description: 'HDL programming and FPGA implementation',
-    credits: 3,
-    department: 'Electronics & Communication',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  // Humanities Electives
-  {
-    id: '19',
-    name: 'Philosophy of Technology',
-    code: 'HU501',
-    semester: 5,
-    track: 'Philosophy',
-    description: 'Exploring the relationship between technology and society',
-    credits: 2,
-    department: 'Humanities',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '20',
-    name: 'Technical Communication',
-    code: 'HU502',
-    semester: 6,
-    track: 'Communication',
-    description: 'Advanced writing and presentation skills for engineers',
-    credits: 2,
-    department: 'Humanities',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '21',
-    name: 'Engineering Economics',
-    code: 'HU503',
-    semester: 7,
-    track: 'Economics',
-    description: 'Economic principles applied to engineering decisions',
-    credits: 3,
-    department: 'Humanities',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '22',
-    name: 'Innovation Management',
-    code: 'HU504',
-    semester: 5,
-    track: 'Management',
-    description: 'Managing innovation processes in technology companies',
-    credits: 3,
-    department: 'Humanities',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  // Open Electives
-  {
-    id: '23',
-    name: 'Digital Marketing',
-    code: 'OE501',
-    semester: 5,
-    track: 'Marketing',
-    description: 'Online marketing strategies and social media management',
-    credits: 3,
-    department: 'Open',
-    category: 'Departmental',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '24',
-    name: 'Financial Literacy',
-    code: 'OE502',
-    semester: 6,
-    track: 'Web Development',
-    description: 'Personal finance, investments, and financial planning',
-    credits: 2,
-    department: 'Open',
-    category: 'Open',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '25',
-    name: 'Environmental Science',
-    code: 'OE503',
-    semester: 7,
-    track: 'Web Development',
-    description: 'Environmental issues and sustainable development',
-    credits: 3,
-    department: 'Open',
-    category: 'Open',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '26',
-    name: 'Data Analytics for Business',
-    code: 'OE504',
-    semester: 5,
-    track: 'Web Development',
-    description: 'Using data science techniques for business insights',
-    credits: 3,
-    department: 'Open',
-    category: 'Open',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '27',
-    name: 'Entrepreneurship',
-    code: 'OE505',
-    semester: 6,
-    track: 'Web Development',
-    description: 'Starting and managing technology startups',
-    credits: 3,
-    department: 'Open',
-    category: 'Open',
-    electiveCategory: 'Elective'
-  },
-  // Humanities Electives
-  {
-    id: '28',
-    name: 'Technical Communication',
-    code: 'HUM501',
-    semester: 5,
-    track: 'Communication & Leadership',
-    description: 'Professional writing and presentation skills',
-    credits: 2,
-    department: 'Humanities',
-    category: 'Humanities',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '29',
-    name: 'Ethics in Engineering',
-    code: 'HUM502',
-    semester: 6,
-    track: 'Philosophy & Ethics',
-    description: 'Moral and ethical issues in engineering practice',
-    credits: 2,
-    department: 'Humanities',
-    category: 'Humanities',
-    electiveCategory: 'Elective'
-  },
-  {
-    id: '30',
-    name: 'Psychology of Technology',
-    code: 'HUM503',
-    semester: 7,
-    track: 'Communication & Leadership',
-    description: 'Human behavior and technology interaction',
-    credits: 3,
-    department: 'Humanities',
-    category: 'Humanities',
-    electiveCategory: 'Elective'
-  }
+  // {
+  //   id: '1',
+  //   name: 'Machine Learning Fundamentals',
+  //   code: 'CS501',
+  //   semester: 5,
+  //   track: 'Data Science & Analytics',
+  //   description: 'Introduction to supervised and unsupervised learning algorithms',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400&h=300&fit=crop&crop=center',
+  //   selectionDeadline: '2025-12-31T23:59:59.000Z'
+  // },
+  // {
+  //   id: '2',
+  //   name: 'Deep Learning',
+  //   code: 'CS502',
+  //   semester: 6,
+  //   track: 'Data Science & Analytics',
+  //   description: 'Neural networks, CNNs, RNNs and their applications',
+  //   prerequisites: ['1'],
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1507146426996-ef05306b995a?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '3',
+  //   name: 'Natural Language Processing',
+  //   code: 'CS503',
+  //   semester: 7,
+  //   track: 'Data Science & Analytics',
+  //   description: 'Text processing, sentiment analysis, and language models',
+  //   prerequisites: ['1'],
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1526378800651-c32d170fe6f8?w=400&h=300&fit=crop&crop=center'
+  // },
+  // // Cybersecurity Track - Computer Science & Engineering (Departmental Electives)
+  // {
+  //   id: '4',
+  //   name: 'Network Security',
+  //   code: 'CS504',
+  //   semester: 5,
+  //   track: 'Cybersecurity',
+  //   description: 'Firewalls, intrusion detection, and network protocols',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '5',
+  //   name: 'Ethical Hacking',
+  //   code: 'CS505',
+  //   semester: 6,
+  //   track: 'Cybersecurity',
+  //   description: 'Penetration testing, vulnerability assessment',
+  //   prerequisites: ['4'],
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '6',
+  //   name: 'Cryptography',
+  //   code: 'CS506',
+  //   semester: 7,
+  //   track: 'Cybersecurity',
+  //   description: 'Encryption algorithms, digital signatures, blockchain',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1614064643087-96ce79ad4c25?w=400&h=300&fit=crop&crop=center'
+  // },
+  // // Data Science Track - Computer Science & Engineering (Departmental Electives)
+  // {
+  //   id: '7',
+  //   name: 'Big Data Analytics',
+  //   code: 'CS507',
+  //   semester: 5,
+  //   track: 'Data Science',
+  //   description: 'Hadoop, Spark, and distributed computing',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '8',
+  //   name: 'Data Visualization',
+  //   code: 'CS508',
+  //   semester: 6,
+  //   track: 'Data Science',
+  //   description: 'Interactive dashboards and visual storytelling',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '9',
+  //   name: 'Statistical Learning',
+  //   code: 'CS509',
+  //   semester: 7,
+  //   track: 'Data Science',
+  //   description: 'Statistical models and hypothesis testing',
+  //   prerequisites: ['7'],
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop&crop=center'
+  // },
+  // // Web Development Track - Computer Science & Engineering (Departmental Electives)
+  // {
+  //   id: '10',
+  //   name: 'Full Stack Development',
+  //   code: 'CS510',
+  //   semester: 5,
+  //   track: 'Web Development',
+  //   description: 'MERN/MEAN stack development and deployment',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '11',
+  //   name: 'Cloud Computing',
+  //   code: 'CS511',
+  //   semester: 6,
+  //   track: 'Web Development',
+  //   description: 'AWS, Azure, and cloud architecture patterns',
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '12',
+  //   name: 'Mobile Development',
+  //   code: 'CS512',
+  //   semester: 7,
+  //   track: 'Web Development',
+  //   description: 'React Native, Flutter, and cross-platform development',
+  //   prerequisites: ['10'],
+  //   credits: 3,
+  //   department: 'Computer Science & Engineering',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop&crop=center'
+  // },
+  // // Digital Signal Processing Track - Electronics & Communication (Departmental Electives)
+  // {
+  //   id: '13',
+  //   name: 'Advanced Signal Processing',
+  //   code: 'EC501',
+  //   semester: 5,
+  //   track: 'Digital Signal Processing',
+  //   description: 'Digital filters, transforms, and signal analysis',
+  //   credits: 3,
+  //   department: 'Electronics & Communication',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '14',
+  //   name: 'Communication Systems',
+  //   code: 'EC502',
+  //   semester: 6,
+  //   track: 'Digital Signal Processing',
+  //   description: 'Modulation, coding, and wireless communication',
+  //   credits: 3,
+  //   department: 'Electronics & Communication',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1476357471311-43c0db9fb2b4?w=400&h=300&fit=crop&crop=center'
+  // },
+  // {
+  //   id: '15',
+  //   name: 'Image Processing',
+  //   code: 'EC503',
+  //   semester: 7,
+  //   track: 'Digital Signal Processing',
+  //   description: 'Digital image enhancement and computer vision',
+  //   prerequisites: ['13'],
+  //   credits: 3,
+  //   department: 'Electronics & Communication',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective',
+  //   image: 'https://images.unsplash.com/photo-1518709594023-6eab9bab7b23?w=400&h=300&fit=crop&crop=center'
+  // },
+  // // VLSI Design Track - Electronics & Communication (Departmental Electives)
+  // {
+  //   id: '16',
+  //   name: 'VLSI Circuit Design',
+  //   code: 'EC504',
+  //   semester: 5,
+  //   track: 'VLSI Design',
+  //   description: 'CMOS circuit design and layout optimization',
+  //   credits: 3,
+  //   department: 'Electronics & Communication',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '17',
+  //   name: 'System-on-Chip Design',
+  //   code: 'EC505',
+  //   semester: 6,
+  //   track: 'VLSI Design',
+  //   description: 'SoC architecture and design methodology',
+  //   prerequisites: ['16'],
+  //   credits: 3,
+  //   department: 'Electronics & Communication',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '18',
+  //   name: 'FPGA Programming',
+  //   code: 'EC506',
+  //   semester: 7,
+  //   track: 'VLSI Design',
+  //   description: 'HDL programming and FPGA implementation',
+  //   credits: 3,
+  //   department: 'Electronics & Communication',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // // Humanities Electives
+  // {
+  //   id: '19',
+  //   name: 'Philosophy of Technology',
+  //   code: 'HU501',
+  //   semester: 5,
+  //   track: 'Philosophy',
+  //   description: 'Exploring the relationship between technology and society',
+  //   credits: 2,
+  //   department: 'Humanities',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '20',
+  //   name: 'Technical Communication',
+  //   code: 'HU502',
+  //   semester: 6,
+  //   track: 'Communication',
+  //   description: 'Advanced writing and presentation skills for engineers',
+  //   credits: 2,
+  //   department: 'Humanities',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '21',
+  //   name: 'Engineering Economics',
+  //   code: 'HU503',
+  //   semester: 7,
+  //   track: 'Economics',
+  //   description: 'Economic principles applied to engineering decisions',
+  //   credits: 3,
+  //   department: 'Humanities',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '22',
+  //   name: 'Innovation Management',
+  //   code: 'HU504',
+  //   semester: 5,
+  //   track: 'Management',
+  //   description: 'Managing innovation processes in technology companies',
+  //   credits: 3,
+  //   department: 'Humanities',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // // Open Electives
+  // {
+  //   id: '23',
+  //   name: 'Digital Marketing',
+  //   code: 'OE501',
+  //   semester: 5,
+  //   track: 'Marketing',
+  //   description: 'Online marketing strategies and social media management',
+  //   credits: 3,
+  //   department: 'Open',
+  //   category: 'Departmental',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '24',
+  //   name: 'Financial Literacy',
+  //   code: 'OE502',
+  //   semester: 6,
+  //   track: 'Web Development',
+  //   description: 'Personal finance, investments, and financial planning',
+  //   credits: 2,
+  //   department: 'Open',
+  //   category: 'Open',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '25',
+  //   name: 'Environmental Science',
+  //   code: 'OE503',
+  //   semester: 7,
+  //   track: 'Web Development',
+  //   description: 'Environmental issues and sustainable development',
+  //   credits: 3,
+  //   department: 'Open',
+  //   category: 'Open',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '26',
+  //   name: 'Data Analytics for Business',
+  //   code: 'OE504',
+  //   semester: 5,
+  //   track: 'Web Development',
+  //   description: 'Using data science techniques for business insights',
+  //   credits: 3,
+  //   department: 'Open',
+  //   category: 'Open',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '27',
+  //   name: 'Entrepreneurship',
+  //   code: 'OE505',
+  //   semester: 6,
+  //   track: 'Web Development',
+  //   description: 'Starting and managing technology startups',
+  //   credits: 3,
+  //   department: 'Open',
+  //   category: 'Open',
+  //   electiveCategory: 'Elective'
+  // },
+  // // Humanities Electives
+  // {
+  //   id: '28',
+  //   name: 'Technical Communication',
+  //   code: 'HUM501',
+  //   semester: 5,
+  //   track: 'Communication & Leadership',
+  //   description: 'Professional writing and presentation skills',
+  //   credits: 2,
+  //   department: 'Humanities',
+  //   category: 'Humanities',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '29',
+  //   name: 'Ethics in Engineering',
+  //   code: 'HUM502',
+  //   semester: 6,
+  //   track: 'Philosophy & Ethics',
+  //   description: 'Moral and ethical issues in engineering practice',
+  //   credits: 2,
+  //   department: 'Humanities',
+  //   category: 'Humanities',
+  //   electiveCategory: 'Elective'
+  // },
+  // {
+  //   id: '30',
+  //   name: 'Psychology of Technology',
+  //   code: 'HUM503',
+  //   semester: 7,
+  //   track: 'Communication & Leadership',
+  //   description: 'Human behavior and technology interaction',
+  //   credits: 3,
+  //   department: 'Humanities',
+  //   category: 'Humanities',
+  //   electiveCategory: 'Elective'
+  // }
 ];
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -996,7 +996,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         console.log('Mapped elective:', newElective);
         
-        // Update local state
+        // Update local state immediately
         const updatedElectives = [...electives, newElective];
         setElectives(updatedElectives);
         localStorage.setItem('electives', JSON.stringify(updatedElectives));
@@ -1004,13 +1004,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Refresh data from backend to ensure consistency
         setTimeout(async () => {
           console.log('Refreshing electives...');
-          const refreshedElectives = await fetchElectives();
-          console.log('Refreshed electives:', refreshedElectives);
-          if (refreshedElectives.length > 0) {
-            setElectives(refreshedElectives);
-            localStorage.setItem('electives', JSON.stringify(refreshedElectives));
-          }
-        }, 1000);
+          await refreshElectives();
+        }, 500);
         
         return true;
       } else {
@@ -1035,7 +1030,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateElective = async (id: string, updates: Partial<Elective>): Promise<boolean> => {
     try {
       // Update in database via API
-      const response = await fetch(`/api/electives/${id}`, {
+      const response = await fetch(`${getApiBaseUrl()}/electives/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

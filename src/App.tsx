@@ -43,6 +43,7 @@ import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminFeedback from './pages/admin/AdminFeedback';
 import AdminAlerts from './pages/admin/AdminAlerts';
 import AdminSystemManagement from './pages/admin/AdminSystemManagement';
+import AdminSystemStatus from './pages/admin/AdminSystemStatus';
 
 // Layout and common components
 import Navbar from './components/layout/Navbar';
@@ -220,6 +221,11 @@ function AppRoutes() {
       <Route path="/admin/system" element={
         <AdminRoute>
           <AdminSystemManagement />
+        </AdminRoute>
+      } />
+      <Route path="/admin/status" element={
+        <AdminRoute>
+          <AdminSystemStatus />
         </AdminRoute>
       } />
       

@@ -39,7 +39,10 @@ const StudentProfile: React.FC = () => {
     setLoading(true);
 
     try {
+      console.log('Submitting profile update with data:', formData);
       const success = await updateProfile(formData);
+      console.log('Profile update result:', success);
+      
       if (success) {
         addNotification({
           type: 'success',
@@ -50,14 +53,15 @@ const StudentProfile: React.FC = () => {
         addNotification({
           type: 'error',
           title: 'Update Failed',
-          message: 'Failed to update profile. Please try again.'
+          message: 'Failed to update profile. Please check your connection and try again.'
         });
       }
-    } catch {
+    } catch (error) {
+      console.error('Profile update error:', error);
       addNotification({
         type: 'error',
         title: 'Error',
-        message: 'An unexpected error occurred.'
+        message: error instanceof Error ? error.message : 'An unexpected error occurred.'
       });
     } finally {
       setLoading(false);

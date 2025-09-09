@@ -209,7 +209,12 @@ const AdminElectives: React.FC = () => {
     
     // Refresh the electives list after successful add/update
     if (success) {
-      await refreshElectives();
+      console.log('Refreshing electives after successful operation...');
+      const refreshSuccess = await refreshElectives();
+      console.log('Refresh result:', refreshSuccess);
+      if (!refreshSuccess) {
+        console.warn('Failed to refresh electives list');
+      }
     }
     
     handleCloseModal();

@@ -1,278 +1,194 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { BookOpen, Award, TrendingUp, Star, Target, Zap, ArrowRight, Clock } from 'lucide-react';
+import { BookOpen, Award, Target, Star, CheckCircle, Clock, TrendingUp } from 'lucide-react';
 
 const StudentProgress: React.FC = () => {
   const { user } = useAuth();
-  const { electives, tracks, getStudentElectives, getTracksByCategory, getTracksByDepartment } = useData();
+  const { electives, getStudentElectives } = useData();
 
   if (!user || user.role !== 'student') return null;
 
   const studentElectives = getStudentElectives(user.id);
   
-  // Categorize electives by category
-  const electiveCategories = ['Departmental', 'Open', 'Humanities'] as const;
-  
-  // Track expertise by category
-  const trackExpertiseByCategory = electiveCategories.map(category => {
-    const categoryTracks = getTracksByCategory(category);
-    const categoryElectives = electives.filter(e => e.category === category);
-    const studentCategoryElectives = studentElectives.filter(se => {
-      const elective = electives.find(e => e.id === se.electiveId);
-      return elective?.category === category;
-    });
-    
-    const trackStats = categoryTracks.map(track => {
-      const trackCategoryElectives = categoryElectives.filter(e => e.track === track.name);
-      const studentTrackElectives = studentCategoryElectives.filter(se => se.track === track.name);
-      const totalAvailable = trackCategoryElectives.length;
-      const completed = studentTrackElectives.length;
-      const percentage = totalAvailable > 0 ? (completed / totalAvailable) * 100 : 0;
-      
-      return {
-        ...track,
-        completed,
-        totalAvailable,
-        percentage: Math.round(percentage),
-        level: percentage >= 80 ? 'Expert' : percentage >= 50 ? 'Intermediate' : percentage >= 20 ? 'Beginner' : 'None'
-      };
-    }).filter(d => d.totalAvailable > 0);
-
-    return {
-      category,
-      trackStats,
-      totalCompleted: studentCategoryElectives.length,
-      totalAvailable: categoryElectives.length
-    };
-  });
-  
-  // Calculate tracks explored count
-  const tracksExplored = new Set(studentElectives.map(se => se.track)).size;
-
+  // Calculate basic statistics
   const totalElectivesCompleted = studentElectives.length;
   const totalCredits = studentElectives.reduce((sum, se) => {
     const elective = electives.find(e => e.id === se.electiveId);
-    return sum + (elective?.credits || 0);
+    return sum + (elective?.credits || 3);
   }, 0);
 
-  const electiveHistory = studentElectives
+  // Categorize completed electives
+  const categorizedElectives = {
+    Departmental: studentElectives.filter(se => {
+      const elective = electives.find(e => e.id === se.electiveId);
+      return elective?.category === 'Departmental';
+    }),
+    Humanities: studentElectives.filter(se => {
+      const elective = electives.find(e => e.id === se.electiveId);
+      return elective?.category === 'Humanities';
+    }),
+    Open: studentElectives.filter(se => {
+      const elective = electives.find(e => e.id === se.electiveId);
+      return elective?.category === 'Open';
+    })
+  };
+
+  // Calculate progress percentages (assuming requirements)
+  const requirements = {
+    Departmental: 4,  // Example: 4 departmental electives required
+    Humanities: 2,    // Example: 2 humanities electives required
+    Open: 2          // Example: 2 open electives required
+  };
+
+  const progressData = Object.entries(categorizedElectives).map(([category, completed]) => {
+    const required = requirements[category as keyof typeof requirements];
+    const percentage = Math.min((completed.length / required) * 100, 100);
+    return {
+      category,
+      completed: completed.length,
+      required,
+      percentage: Math.round(percentage),
+      remaining: Math.max(0, required - completed.length)
+    };
+  });
+
+  // Recent electives
+  const recentElectives = studentElectives
     .map(se => {
       const elective = electives.find(e => e.id === se.electiveId);
       return { ...se, elective };
     })
-    .sort((a, b) => a.semester - b.semester);
-
-  // Current semester recommendations
-  const currentSemester = user.semester || 5;
-  const nextSemester = currentSemester + 1;
-  
-  // Get current track (most common track in completed electives)
-  const trackAnalysis = tracks.map(track => ({
-    track: track.name,
-    count: studentElectives.filter(se => se.track === track.name).length,
-    color: track.color
-  })).sort((a, b) => b.count - a.count);
-  
-  const departmenttracks = getTracksByDepartment(user.department || '');
-  const currentTrack = trackAnalysis[0]?.track || departmenttracks[0]?.name || '';
-  
-  // Recommend electives for next semester based on current track
-  const nextSemesterElectives = electives.filter(e => 
-    e.semester === nextSemester && 
-    !studentElectives.some(se => se.electiveId === e.id)
-  );
-  
-  const recommendedElectives = nextSemesterElectives.filter(e => e.track === currentTrack);
-
-  // Get expertise level icon and color
-  const getExpertiseIcon = (level: string) => {
-    switch (level) {
-      case 'Expert': return <Star className="w-4 h-4 text-yellow-500" />;
-      case 'Intermediate': return <Target className="w-4 h-4 text-blue-500" />;
-      case 'Beginner': return <Zap className="w-4 h-4 text-green-500" />;
-      default: return <div className="w-4 h-4 bg-gray-300 rounded-full" />;
-    }
-  };
-
-  const getExpertiseColor = (level: string) => {
-    switch (level) {
-      case 'Expert': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'Intermediate': return 'text-blue-600 bg-blue-50 border-blue-200';
-      case 'Beginner': return 'text-green-600 bg-green-50 border-green-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
-  };
-
-  const gettrackColor = (track: string) => {
-    const trackObj = tracks.find(d => d.name === track);
-    return trackObj?.color || 'bg-gray-500';
-  };
+    .filter(item => item.elective)
+    .sort((a, b) => b.semester - a.semester)
+    .slice(0, 3);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Academic Progress</h1>
+        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <TrendingUp className="w-8 h-8 text-blue-600" />
+          My Progress
+        </h1>
         <p className="text-gray-600 mt-2">
-          Track your elective journey and track expertise across all categories
+          Track your elective journey and academic progress
         </p>
       </div>
 
-      {/* Overview Stats */}
+      {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Electives</p>
+              <p className="text-3xl font-bold text-blue-600">{totalElectivesCompleted}</p>
+            </div>
             <BookOpen className="w-8 h-8 text-blue-600" />
-            <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{totalElectivesCompleted}</p>
-              <p className="text-gray-600">Electives Completed</p>
-            </div>
           </div>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center">
+        
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Credits Earned</p>
+              <p className="text-3xl font-bold text-green-600">{totalCredits}</p>
+            </div>
             <Award className="w-8 h-8 text-green-600" />
-            <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{totalCredits}</p>
-              <p className="text-gray-600">Credits Earned</p>
-            </div>
           </div>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center">
-            <TrendingUp className="w-8 h-8 text-purple-600" />
-            <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">
-                {tracksExplored}
-              </p>
-              <p className="text-gray-600">tracks Explored</p>
+        
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Current Semester</p>
+              <p className="text-3xl font-bold text-purple-600">{user.semester || 5}</p>
             </div>
+            <Target className="w-8 h-8 text-purple-600" />
           </div>
         </div>
       </div>
 
-      {/* track Expertise by Category */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-6">track Expertise by Category</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {trackExpertiseByCategory.map(({ category, trackStats, totalCompleted, totalAvailable }) => (
-            <div key={category} className="bg-white p-6 rounded-lg shadow-sm border">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">{category} Electives</h3>
-                <span className="text-sm text-gray-600">
-                  {totalCompleted}/{totalAvailable} completed
-                </span>
+      {/* Progress by Category */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">Progress by Category</h2>
+        
+        <div className="space-y-6">
+          {progressData.map((category) => {
+            const categoryConfig = {
+              'Departmental': { color: 'bg-blue-500', textColor: 'text-blue-600', bgLight: 'bg-blue-50' },
+              'Humanities': { color: 'bg-purple-500', textColor: 'text-purple-600', bgLight: 'bg-purple-50' },
+              'Open': { color: 'bg-green-500', textColor: 'text-green-600', bgLight: 'bg-green-50' }
+            };
+            
+            const config = categoryConfig[category.category as keyof typeof categoryConfig];
+            
+            return (
+              <div key={category.category} className={`p-4 rounded-lg ${config.bgLight}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={`font-semibold ${config.textColor}`}>
+                    {category.category} Electives
+                  </h3>
+                  <span className="text-sm text-gray-600">
+                    {category.completed}/{category.required} completed
+                  </span>
+                </div>
+                
+                <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                  <div 
+                    className={`h-3 rounded-full transition-all duration-500 ${config.color}`}
+                    style={{ width: `${category.percentage}%` }}
+                  ></div>
+                </div>
+                
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>{category.percentage}% complete</span>
+                  <span>
+                    {category.remaining > 0 ? `${category.remaining} more needed` : 'Requirements met!'}
+                  </span>
+                </div>
               </div>
-              
-              <div className="space-y-3">
-                {trackStats.map(track => (
-                  <div key={track.id} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full`} style={{backgroundColor: track.color}}></div>
-                      <span className="text-sm font-medium text-gray-900">{track.name}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getExpertiseColor(track.level)}`}>
-                        {getExpertiseIcon(track.level)}
-                        <span className="ml-1">{track.level}</span>
-                      </span>
-                      <span className="text-xs text-gray-500">{track.completed}/{track.totalAvailable}</span>
-                    </div>
-                  </div>
-                ))}
-                {trackStats.length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">No tracks available in this category</p>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Next Semester Recommendations */}
-      {nextSemesterElectives.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">
-            Semester {nextSemester} Recommendations
-          </h2>
-          
-          {currentTrack && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <Target className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-900">Your Current Track: {currentTrack}</span>
-              </div>
-              <p className="text-sm text-blue-700 mt-1">
-                Based on your completed electives, these recommendations align with your learning path.
-              </p>
-            </div>
-          )}
-
-          {recommendedElectives.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Star className="w-5 h-5 text-yellow-500 mr-2" />
-                Recommended for You
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {recommendedElectives.map(elective => (
-                  <div key={elective.id} className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200">
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{elective.name}</h4>
-                      <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                        Recommended
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-2">{elective.code} • {elective.credits} Credits</p>
-                    <p className="text-sm text-gray-700 mb-3">{elective.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${gettrackColor(elective.track)}`}>
-                        {elective.track}
-                      </span>
-                      <span className="text-xs text-gray-500">{elective.electiveCategory}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Academic Timeline */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-6">Academic Timeline</h2>
-        {electiveHistory.length > 0 ? (
+      {/* Recent Electives */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">Recently Completed</h2>
+        
+        {recentElectives.length > 0 ? (
           <div className="space-y-4">
-            {electiveHistory.map((se) => (
-              <div key={`${se.studentId}-${se.electiveId}`} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <Clock className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
+            {recentElectives.map((item) => (
+              <div key={item.electiveId} className="flex items-center p-4 bg-gray-50 rounded-lg">
+                <CheckCircle className="w-6 h-6 text-green-500 mr-4" />
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900">{se.elective?.name}</h4>
+                  <h3 className="font-medium text-gray-900">{item.elective?.name}</h3>
                   <p className="text-sm text-gray-600">
-                    {se.elective?.code} • Semester {se.semester} • {se.track}
+                    {item.elective?.code} • Semester {item.semester} • {item.elective?.credits} credits
                   </p>
+                  <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
+                    item.elective?.category === 'Departmental' ? 'bg-blue-100 text-blue-800' :
+                    item.elective?.category === 'Humanities' ? 'bg-purple-100 text-purple-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {item.elective?.category}
+                  </span>
                 </div>
-                <div className="text-right">
-                  <span className="text-sm font-medium text-gray-900">{se.elective?.credits} Credits</span>
-                  <p className="text-xs text-gray-500">
-                    {new Date(se.dateSelected).toLocaleDateString()}
-                  </p>
-                </div>
+                {item.feedback && (
+                  <div className="flex items-center ml-4">
+                    <Star className="w-4 h-4 text-yellow-500 mr-1" />
+                    <span className="text-sm text-gray-600">{item.feedback.rating}/5</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
           <div className="text-center py-8">
-            <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No electives completed yet</h3>
-            <p className="text-gray-600">Start your elective journey to see your progress here.</p>
+            <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No electives completed yet</p>
+            <p className="text-sm text-gray-500 mt-1">Start selecting electives to track your progress</p>
           </div>
         )}
       </div>

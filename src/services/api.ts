@@ -148,13 +148,18 @@ export const authApi = {
   },
 
   async updateProfile(data: Partial<User>): Promise<User> {
+    console.log('API: Updating profile with data:', data);
+    
     const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     
+    console.log('API: Profile update response status:', response.status);
+    
     const result = await handleResponse<{ message: string; user: User }>(response);
+    console.log('API: Profile update result:', result);
     return result.user; // Extract user from the response object
   },
 

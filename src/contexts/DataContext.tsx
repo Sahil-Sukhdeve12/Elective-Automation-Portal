@@ -25,7 +25,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // API Base URL helper
 const getApiBaseUrl = () => {
-  return 'https://elective-selection-system.onrender.com/api';
+  return import.meta.env.VITE_API_BASE_URL || 
+    (import.meta.env.MODE === 'production' 
+      ? 'https://elective-selection-system.onrender.com/api' 
+      : 'http://localhost:5000/api');
 };
 
 // API functions to fetch data from backend

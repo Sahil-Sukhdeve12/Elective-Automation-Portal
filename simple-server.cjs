@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const path = require('path');
 require('dotenv').config({ quiet: true });
 
 const app = express();
@@ -15,6 +16,9 @@ app.use(cors({
 // Increase payload size limit for image uploads
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Serve static files from the React app build
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -514,6 +518,16 @@ app.delete('/api/electives/:id', authenticateToken, async (req, res) => {
       error: 'Failed to delete elective',
       details: error.message 
     });
+  }
+});
+
+// Handle React Router - serve index.html for all non-API routes
+app.get('*', (req, res) => {
+  // Only serve React app for non-API routes
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  } else {
+    res.status(404).json({ error: 'API endpoint not found' });
   }
 });
 

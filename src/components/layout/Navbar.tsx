@@ -64,6 +64,7 @@ const Navbar: React.FC = () => {
     { path: '/admin/electives', label: 'Manage Electives', icon: BookOpen },
     { path: '/admin/students', label: 'Students', icon: User },
     { path: '/admin/feedback', label: 'Feedback Forms', icon: MessageSquare },
+    { path: '/admin/feedback-responses', label: 'Feedback Responses', icon: MessageSquare },
     { path: '/admin/alerts', label: 'Alerts', icon: Bell },
     { path: '/admin/system', label: 'System Management', icon: BarChart3 },
   ];

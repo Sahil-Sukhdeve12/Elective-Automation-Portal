@@ -41,38 +41,27 @@ export const seedInitialData = () => {
 
     localStorage.setItem('users', JSON.stringify(demoUsers));
 
-    // Add some demo student electives
-    const demoStudentElectives = [
-      {
-        studentId: 'student1',
-        electiveId: '1',
-        semester: 5,
-        track: 'Artificial Intelligence',
-        completedAt: new Date('2024-06-15')
-      },
-      {
-        studentId: 'student1',
-        electiveId: '4',
-        semester: 6,
-        track: 'Cybersecurity',
-        completedAt: new Date('2024-12-15')
-      },
-      {
-        studentId: 'student2',
-        electiveId: '7',
-        semester: 5,
-        track: 'Data Science',
-        completedAt: new Date('2024-06-15')
-      }
-    ];
-
-    localStorage.setItem('studentElectives', JSON.stringify(demoStudentElectives));
+    // No hardcoded student electives - students will select from admin-created electives
+    console.log('Demo users created - electives will be managed by admin interface');
   }
 };
 
 // Call this to initialize demo data
 export const initializeDemoData = () => {
   if (typeof window !== 'undefined') {
+    // Clear any existing hardcoded data including any cached electives
+    localStorage.removeItem('electives');
+    localStorage.removeItem('studentElectives');
+    localStorage.removeItem('electiveFeedback');
+    
     seedInitialData();
+  }
+};
+
+// Function to completely reset all demo data (for development)
+export const resetAllData = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.clear();
+    console.log('All localStorage data cleared - fresh start with admin-created electives only');
   }
 };

@@ -33,6 +33,9 @@ export interface RegisterData {
   role: 'student' | 'admin';
   department?: string;
   semester?: number;
+  registrationNumber?: string;
+  mobile?: string;
+  section?: string;
 }
 
 export interface ElectiveData {

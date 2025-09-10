@@ -239,10 +239,10 @@ const StudentElectives: React.FC = () => {
             return (
               <div key={elective.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow overflow-hidden">
                 {/* Elective Image */}
-                {(elective.infoImage || elective.image) && (
+                {elective.infoImage && (
                   <div className="h-48 w-full">
                     <img 
-                      src={elective.infoImage || elective.image} 
+                      src={elective.infoImage} 
                       alt={elective.name}
                       className="w-full h-full object-cover"
                       onError={(e) => {

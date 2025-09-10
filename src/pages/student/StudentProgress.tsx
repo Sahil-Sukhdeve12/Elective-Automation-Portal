@@ -1,22 +1,44 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import { BookOpen, Award, Target, Star, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { BookOpen, Award, Target, Star, CheckCircle, Clock, TrendingUp, Calendar } from 'lucide-react';
 
 const StudentProgress: React.FC = () => {
   const { user } = useAuth();
   const { electives, getStudentElectives } = useData();
 
+  // Memoize student electives
+  const studentElectives = React.useMemo(() => 
+    user ? getStudentElectives(user.id) : [], 
+    [user, getStudentElectives]
+  );
+  
+  // Group electives by semester
+  const electivesBySemester = React.useMemo(() => {
+    const semesters: { [key: number]: typeof studentElectives } = {};
+    
+    studentElectives.forEach(se => {
+      if (!semesters[se.semester]) {
+        semesters[se.semester] = [];
+      }
+      semesters[se.semester].push(se);
+    });
+    
+    return semesters;
+  }, [studentElectives]);
+
   if (!user || user.role !== 'student') return null;
 
-  const studentElectives = getStudentElectives(user.id);
-  
   // Calculate basic statistics
   const totalElectivesCompleted = studentElectives.length;
   const totalCredits = studentElectives.reduce((sum, se) => {
     const elective = electives.find(e => e.id === se.electiveId);
     return sum + (elective?.credits || 3);
   }, 0);
+
+  // Get all semesters (1-8) for display
+  const allSemesters = Array.from({ length: 8 }, (_, i) => i + 1);
+  const currentSemester = user.semester || 1;
 
   // Categorize completed electives
   const categorizedElectives = {
@@ -109,6 +131,103 @@ const StudentProgress: React.FC = () => {
         </div>
       </div>
 
+      {/* Semester-wise Progress */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+          <Calendar className="w-5 h-5" />
+          Semester-wise Elective Selection
+        </h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {allSemesters.map(semester => {
+            const semesterElectives = electivesBySemester[semester] || [];
+            const isPast = semester < currentSemester;
+            const isCurrent = semester === currentSemester;
+            
+            return (
+              <div 
+                key={semester}
+                className={`p-4 rounded-lg border-2 ${
+                  isPast ? 'bg-green-50 border-green-200' :
+                  isCurrent ? 'bg-blue-50 border-blue-200' :
+                  'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={`font-semibold ${
+                    isPast ? 'text-green-800' :
+                    isCurrent ? 'text-blue-800' :
+                    'text-gray-600'
+                  }`}>
+                    Semester {semester}
+                  </h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    isPast ? 'bg-green-100 text-green-800' :
+                    isCurrent ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {isPast ? 'Completed' : isCurrent ? 'Current' : 'Upcoming'}
+                  </span>
+                </div>
+                
+                {semesterElectives.length > 0 ? (
+                  <div className="space-y-2">
+                    {semesterElectives.map(se => {
+                      const elective = electives.find(e => e.id === se.electiveId);
+                      if (!elective) return null;
+                      
+                      return (
+                        <div 
+                          key={se.electiveId}
+                          className="p-2 bg-white rounded border text-sm"
+                        >
+                          <div className="font-medium text-gray-900 mb-1">
+                            {elective.name}
+                          </div>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>{elective.code} • {elective.credits} Credits</div>
+                            <div className="flex items-center gap-1">
+                              <span className={`px-1 py-0.5 rounded text-xs ${
+                                elective.category === 'Departmental' ? 'bg-blue-100 text-blue-700' :
+                                elective.category === 'Humanities' ? 'bg-purple-100 text-purple-700' :
+                                'bg-orange-100 text-orange-700'
+                              }`}>
+                                {elective.category}
+                              </span>
+                              {elective.subjectType && (
+                                <span className={`px-1 py-0.5 rounded text-xs ${
+                                  elective.subjectType === 'Theory' ? 'bg-green-100 text-green-700' :
+                                  elective.subjectType === 'Practical' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-purple-100 text-purple-700'
+                                }`}>
+                                  {elective.subjectType === 'Theory+Practical' ? 'Theory+Practical' : elective.subjectType}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <div className={`text-xs ${
+                      isPast ? 'text-green-600' :
+                      isCurrent ? 'text-blue-600' :
+                      'text-gray-500'
+                    }`}>
+                      {isPast ? 'No electives taken' :
+                       isCurrent ? 'No electives selected yet' :
+                       'Not yet available'}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Progress by Category */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
         <h2 className="text-xl font-semibold text-gray-900 mb-6">Progress by Category</h2>
@@ -167,13 +286,24 @@ const StudentProgress: React.FC = () => {
                   <p className="text-sm text-gray-600">
                     {item.elective?.code} • Semester {item.semester} • {item.elective?.credits} credits
                   </p>
-                  <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
-                    item.elective?.category === 'Departmental' ? 'bg-blue-100 text-blue-800' :
-                    item.elective?.category === 'Humanities' ? 'bg-purple-100 text-purple-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {item.elective?.category}
-                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                      item.elective?.category === 'Departmental' ? 'bg-blue-100 text-blue-800' :
+                      item.elective?.category === 'Humanities' ? 'bg-purple-100 text-purple-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {item.elective?.category}
+                    </span>
+                    {item.elective?.subjectType && (
+                      <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                        item.elective.subjectType === 'Theory' ? 'bg-green-100 text-green-800' :
+                        item.elective.subjectType === 'Practical' ? 'bg-orange-100 text-orange-800' :
+                        'bg-purple-100 text-purple-800'
+                      }`}>
+                        {item.elective.subjectType === 'Theory+Practical' ? 'Theory+Practical' : item.elective.subjectType}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {item.feedback && (
                   <div className="flex items-center ml-4">

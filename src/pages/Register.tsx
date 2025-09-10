@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { GraduationCap, User, Mail, Lock, Phone, Building } from 'lucide-react';
+import { GraduationCap, User, Mail, Lock, Phone, Building, Hash } from 'lucide-react';
 
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -15,6 +15,7 @@ const Register: React.FC = () => {
     semester: 5,
     section: '',
     mobile: '',
+    registrationNumber: '',
     role: 'student' as 'student' | 'admin'
   });
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ const Register: React.FC = () => {
   };
 
   const validateForm = () => {
-    const { name, email, password, confirmPassword } = formData;
+    const { name, email, password, confirmPassword, registrationNumber } = formData;
     
     if (name.length < 3 || name.length > 60) {
       addNotification({
@@ -66,6 +67,15 @@ const Register: React.FC = () => {
         type: 'error',
         title: 'Validation Error',
         message: 'Please enter a valid email address.'
+      });
+      return false;
+    }
+
+    if (!registrationNumber || registrationNumber.length < 5) {
+      addNotification({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please enter a valid registration number (minimum 5 characters).'
       });
       return false;
     }
@@ -291,6 +301,25 @@ const Register: React.FC = () => {
                       placeholder="Mobile number"
                     />
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                  Registration Number *
+                </label>
+                <div className="mt-1 relative">
+                  <Hash className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                  <input
+                    id="registrationNumber"
+                    name="registrationNumber"
+                    type="text"
+                    required
+                    value={formData.registrationNumber}
+                    onChange={handleChange}
+                    className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="e.g., 2023CRPFTAIE120"
+                  />
                 </div>
               </div>
 

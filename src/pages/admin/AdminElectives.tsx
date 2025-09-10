@@ -19,7 +19,7 @@ const AdminElectives: React.FC = () => {
   
   const [showModal, setShowModal] = useState(false);
   const [editingElective, setEditingElective] = useState<Elective | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -45,22 +45,18 @@ const AdminElectives: React.FC = () => {
   // Get departments
   const departments = getAvailableDepartments();
   
-  // Filter electives by category
-  const electiveCategories = ['all', 'Humanities', 'Departmental', 'Open'];
-  const filteredElectives = selectedCategory === 'all' 
+  // Filter electives by department instead of category
+  const departmentFilter = ['all', ...departments];
+  const filteredElectives = selectedDepartment === 'all' 
     ? electives 
-    : electives.filter(e => e.category === selectedCategory);
+    : electives.filter(e => e.department === selectedDepartment);
 
-  // Group electives by category and then by department
-  const electivesByCategory = ['Humanities', 'Departmental', 'Open'].map(category => ({
-    category,
-    departmentGroups: departments.map(department => ({
-      department,
-      electives: electives.filter(e => e.category === category && e.department === department),
-      count: electives.filter(e => e.category === category && e.department === department).length
-    })).filter(group => group.count > 0),
-    totalCount: electives.filter(e => e.category === category).length
-  }));
+  // Group electives by department
+  const electivesByDepartment = departments.map(department => ({
+    department,
+    electives: electives.filter(e => e.department === department),
+    count: electives.filter(e => e.department === department).length
+  })).filter(group => group.count > 0);
 
   const handleOpenModal = (elective?: Elective) => {
     if (elective) {
@@ -119,6 +115,15 @@ const AdminElectives: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Automatically determine elective category based on department
+    let electiveCategory: 'Humanities' | 'Departmental' | 'Open' = 'Departmental';
+    if (formData.department === 'Humanities' || formData.department === 'Liberal Arts') {
+      electiveCategory = 'Humanities';
+    } else if (formData.department !== formData.department) {
+      // This logic can be enhanced based on your requirements
+      electiveCategory = 'Open';
+    }
+    
     // Basic validation
     if (!formData.name || !formData.code || !formData.track || !formData.description || !formData.department) {
       addNotification({
@@ -160,14 +165,9 @@ const AdminElectives: React.FC = () => {
       credits: formData.credits,
       prerequisites: formData.prerequisites,
       department: formData.department,
-      category: formData.electiveCategory as 'Departmental' | 'Humanities' | 'Open',
+      category: electiveCategory,
       electiveCategory: 'Elective' as const,
       subjectType: formData.subjectType,
-      // Include new multi-department fields for Open electives
-      ...(formData.electiveCategory === 'Open' && {
-        offeredBy: formData.offeredBy,
-        eligibleDepartments: formData.eligibleDepartments
-      }),
       image: formData.infoImage || undefined, // Include the image
       selectionDeadline: formData.selectionDeadline || undefined, // Include the deadline
     };
@@ -407,23 +407,23 @@ const AdminElectives: React.FC = () => {
         </div>
       </div>
 
-      {/* Category Filter */}
+      {/* Department Filter */}
       <div className="mb-6">
         <div className="flex space-x-2 flex-wrap">
-          {electiveCategories.map(category => (
+          {departmentFilter.map(department => (
             <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
+              key={department}
+              onClick={() => setSelectedDepartment(department)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                selectedCategory === category
+                selectedDepartment === department
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {category === 'all' ? 'All Categories' : category}
-              {category !== 'all' && (
+              {department === 'all' ? 'All Departments' : department}
+              {department !== 'all' && (
                 <span className="ml-2 text-xs">
-                  ({electives.filter(e => e.category === category).length})
+                  ({electives.filter(e => e.department === department).length})
                 </span>
               )}
             </button>
@@ -431,37 +431,27 @@ const AdminElectives: React.FC = () => {
         </div>
       </div>
 
-      {/* Categorized Electives Display */}
-      {selectedCategory === 'all' ? (
+      {/* Department-wise Electives Display */}
+      {selectedDepartment === 'all' ? (
         <div className="space-y-8">
-          {electivesByCategory.map(({ category, departmentGroups, totalCount }) => (
-            <div key={category} className="bg-white rounded-lg shadow-sm border p-6">
+          {electivesByDepartment.map(({ department, electives: deptElectives, count }) => (
+            <div key={department} className="bg-white rounded-lg shadow-sm border p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">
-                  {category} Electives
-                  <span className="ml-2 text-sm text-gray-500">({totalCount} total)</span>
+                  {department} Electives
+                  <span className="ml-2 text-sm text-gray-500">({count} total)</span>
                 </h2>
               </div>
               
-              {departmentGroups.length > 0 ? (
-                <div className="space-y-6">
-                  {departmentGroups.map(({ department, electives: deptElectives, count }) => (
-                    <div key={department} className="border-l-4 border-blue-500 pl-4">
-                      <h3 className="text-lg font-medium text-gray-800 mb-4">
-                        {department}
-                        <span className="ml-2 text-sm text-gray-500">({count} electives)</span>
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {deptElectives.map(elective => (
-                          <ElectiveCard key={elective.id} elective={elective} />
-                        ))}
-                      </div>
-                    </div>
+              {deptElectives.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {deptElectives.map(elective => (
+                    <ElectiveCard key={elective.id} elective={elective} />
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
-                  No electives in this category
+                  No electives in this department
                 </div>
               )}
             </div>
@@ -470,7 +460,7 @@ const AdminElectives: React.FC = () => {
       ) : (
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            {selectedCategory} Electives
+            {selectedDepartment} Electives
             <span className="ml-2 text-sm text-gray-500">({filteredElectives.length} total)</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -479,7 +469,7 @@ const AdminElectives: React.FC = () => {
             ))}
             {filteredElectives.length === 0 && (
               <div className="col-span-full text-center py-8 text-gray-500">
-                No electives in this category
+                No electives in this department
               </div>
             )}
           </div>
@@ -548,23 +538,6 @@ const AdminElectives: React.FC = () => {
                     {getAvailableSemesters().map(sem => (
                       <option key={sem} value={sem}>Semester {sem}</option>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Elective Category *
-                  </label>
-                  <select
-                    name="electiveCategory"
-                    value={formData.electiveCategory}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="Departmental">Departmental</option>
-                    <option value="Humanities">Humanities</option>
-                    <option value="Open">Open</option>
                   </select>
                 </div>
 
@@ -707,6 +680,9 @@ const AdminElectives: React.FC = () => {
                   </select>
                 </div>
 
+                
+                 
+                {/* {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category *
@@ -721,7 +697,8 @@ const AdminElectives: React.FC = () => {
                     <option value="Theory">Theory</option>
                     <option value="Practical">Practical</option>
                   </select>
-                </div>
+                </div> 
+                } */}
               </div>
 
               <div>

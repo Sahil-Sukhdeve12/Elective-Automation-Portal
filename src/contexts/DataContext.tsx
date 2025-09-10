@@ -123,6 +123,7 @@ export interface Elective {
   semester: number;
   track: string;
   image?: string; // Optional image URL for the elective
+  infoImage?: string; // Alternative field name for image (for backward compatibility)
   selectionDeadline?: string; // ISO date string for selection deadline
   prerequisites?: string[];
   futureOpportunities?: string[];

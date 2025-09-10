@@ -47,6 +47,9 @@ interface RegisterUserData {
   role: 'student' | 'admin';           // User role for access control
   department?: string;                  // Academic department (for students)
   semester?: number;                    // Current semester (for students)
+  registrationNumber?: string;          // Registration/Roll number (for students)
+  mobile?: string;                      // Mobile phone number
+  section?: string;                     // Section (for students)
 }
 
 // Create React Context for authentication
@@ -166,7 +169,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: userData.password,
         role: userData.role,
         department: userData.department,
-        semester: userData.semester
+        semester: userData.semester,
+        registrationNumber: userData.registrationNumber,
+        mobile: userData.mobile,
+        section: userData.section
       });
       
       if (response.token && response.user) {

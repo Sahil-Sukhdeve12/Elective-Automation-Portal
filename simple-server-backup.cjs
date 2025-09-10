@@ -143,16 +143,13 @@ app.post('/api/auth/login', async (req, res) => {
 // Register endpoint
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role, department, semester, registrationNumber, mobile, section } = req.body;
+    const { name, email, password, role, department, semester } = req.body;
 
     console.log('📝 Registration attempt:', { 
       email, 
       role, 
       department, 
       semester,
-      registrationNumber,
-      mobile,
-      section,
       body: req.body 
     });
 
@@ -161,14 +158,13 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
-    if (role === 'student' && (!department || !semester || !registrationNumber)) {
+    if (role === 'student' && (!department || !semester)) {
       console.log('❌ Missing student fields:', { 
         department: !!department, 
-        semester: !!semester,
-        registrationNumber: !!registrationNumber
+        semester: !!semester 
       });
       return res.status(400).json({ 
-        error: 'Department, semester, and registration number are required for students' 
+        error: 'Department and semester are required for students' 
       });
     }
 
@@ -176,15 +172,6 @@ app.post('/api/auth/register', async (req, res) => {
     if (existingUser) {
       console.log('❌ User already exists:', email);
       return res.status(400).json({ error: 'Email already exists' });
-    }
-
-    // Check if registration number already exists for students
-    if (role === 'student' && registrationNumber) {
-      const existingRegNumber = await User.findOne({ rollNumber: registrationNumber });
-      if (existingRegNumber) {
-        console.log('❌ Registration number already exists:', registrationNumber);
-        return res.status(400).json({ error: 'Registration number already exists' });
-      }
     }
 
     const saltRounds = 10;
@@ -196,14 +183,11 @@ app.post('/api/auth/register', async (req, res) => {
       password: hashedPassword,
       role: role || 'student',
       department: role === 'student' ? department : undefined,
-      semester: role === 'student' ? semester : undefined,
-      rollNumber: role === 'student' ? registrationNumber : undefined,
-      mobile: role === 'student' ? mobile : undefined,
-      section: role === 'student' ? section : undefined
+      semester: role === 'student' ? semester : undefined
     });
 
     await newUser.save();
-    console.log('✅ User created successfully:', { email, registrationNumber });
+    console.log('✅ User created successfully:', { email });
 
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
@@ -220,10 +204,7 @@ app.post('/api/auth/register', async (req, res) => {
         email: newUser.email,
         role: newUser.role,
         department: newUser.department,
-        semester: newUser.semester,
-        rollNumber: newUser.rollNumber,
-        mobile: newUser.mobile,
-        section: newUser.section
+        semester: newUser.semester
       }
     });
   } catch (error) {
@@ -379,13 +360,8 @@ app.get('/api/electives', async (req, res) => {
 });
 
 // Create new elective (Admin only)
-app.post('/api/electives', authenticateToken, async (req, res) => {
+app.post('/api/electives', async (req, res) => {
   try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
     console.log('🔥 Creating new elective:', req.body);
     
     const {
@@ -443,13 +419,8 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
 });
 
 // Update elective (Admin only)
-app.put('/api/electives/:id', authenticateToken, async (req, res) => {
+app.put('/api/electives/:id', async (req, res) => {
   try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
     const { id } = req.params;
     console.log('🔄 Updating elective:', id, req.body);
     
@@ -483,13 +454,8 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete elective (Admin only)
-app.delete('/api/electives/:id', authenticateToken, async (req, res) => {
+app.delete('/api/electives/:id', async (req, res) => {
   try {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
     const { id } = req.params;
     console.log('🗑️ Deleting elective:', id);
     

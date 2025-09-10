@@ -89,8 +89,25 @@ class ApiError extends Error {
 
 // Helper function to handle API responses
 const handleResponse = async <T>(response: Response): Promise<T> => {
+  console.log('API Response status:', response.status, 'URL:', response.url);
+  
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'An error occurred' }));
+    const errorText = await response.text();
+    console.error('API Error response:', errorText);
+    
+    // If unauthorized, clear the token
+    if (response.status === 401 || response.status === 403) {
+      console.log('Token expired or invalid, clearing auth token');
+      localStorage.removeItem('authToken');
+    }
+    
+    let errorData;
+    try {
+      errorData = JSON.parse(errorText);
+    } catch {
+      errorData = { message: 'An error occurred' };
+    }
+    
     throw new ApiError(response.status, errorData.message || 'An error occurred');
   }
   
@@ -100,6 +117,8 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 // Helper function to get auth headers
 const getAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem('authToken'); // Correct key used by AuthContext
+  console.log('Auth token exists:', !!token, 'Token preview:', token ? token.substring(0, 20) + '...' : 'none');
+  
   return {
     'Content-Type': 'application/json',
     ...(token && { Authorization: `Bearer ${token}` }),

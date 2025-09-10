@@ -1104,10 +1104,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteElective = async (id: string): Promise<boolean> => {
-    const updatedElectives = electives.filter(e => e.id !== id);
-    setElectives(updatedElectives);
-    localStorage.setItem('electives', JSON.stringify(updatedElectives));
-    return true;
+    try {
+      console.log('Deleting elective:', id);
+      
+      // Delete from database via API
+      const response = await fetch(`${getApiBaseUrl()}/electives/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      console.log('Delete API response status:', response.status);
+      
+      if (response.ok) {
+        // Update local state
+        const updatedElectives = electives.filter(e => e.id !== id);
+        setElectives(updatedElectives);
+        localStorage.setItem('electives', JSON.stringify(updatedElectives));
+        return true;
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Failed to delete elective:', errorData);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error deleting elective:', error);
+      return false;
+    }
   };
 
   const selectElective = async (studentId: string, electiveId: string, semester: number): Promise<boolean> => {

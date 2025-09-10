@@ -420,9 +420,12 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       category,
       electiveCategory,
       image,
-      selectionDeadline,
+      deadline,
+      selectionDeadline, // Support both field names
       prerequisites,
-      futureOptions
+      futureOptions,
+      instructor,
+      maxStudents
     } = req.body;
 
     // Create new elective
@@ -438,7 +441,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       electiveCategory,
       instructor,
       image,
-      deadline: selectionDeadline ? new Date(selectionDeadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Fixed: use 'deadline' not 'selectionDeadline'
+      deadline: deadline || selectionDeadline ? new Date(deadline || selectionDeadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Support both field names
       prerequisites: prerequisites || [],
       futureOptions: futureOptions || [],
       maxStudents: req.body.maxStudents || 50,

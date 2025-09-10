@@ -169,7 +169,7 @@ const AdminElectives: React.FC = () => {
       electiveCategory: 'Elective' as const,
       subjectType: formData.subjectType,
       image: formData.infoImage || undefined, // Include the image
-      selectionDeadline: formData.selectionDeadline || undefined, // Include the deadline
+      deadline: formData.selectionDeadline || undefined, // Fixed: use 'deadline' to match backend schema
     };
     
     let success = false;

@@ -370,14 +370,31 @@ app.get('/api/users', async (req, res) => {
 // Get all electives
 app.get('/api/electives', async (req, res) => {
   try {
+    console.log('📚 Fetching electives...');
     const electives = await Elective.find({});
+    console.log(`✅ Found ${electives.length} electives`);
+    
+    // Add deadline status to each elective
+    const electivesWithStatus = electives.map(elective => {
+      const now = new Date();
+      const deadline = elective.deadline;
+      const isExpired = deadline && deadline < now;
+      
+      return {
+        ...elective.toObject(),
+        isExpired,
+        canSelect: !isExpired,
+        daysLeft: deadline ? Math.ceil((deadline - now) / (1000 * 60 * 60 * 24)) : null
+      };
+    });
+    
     res.json({
       success: true,
-      count: electives.length,
-      electives: electives
+      count: electivesWithStatus.length,
+      electives: electivesWithStatus
     });
   } catch (error) {
-    console.error('Error fetching electives:', error);
+    console.error('❌ Error fetching electives:', error);
     res.status(500).json({ error: 'Failed to fetch electives' });
   }
 });
@@ -419,10 +436,13 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       department,
       category,
       electiveCategory,
+      instructor,
       image,
-      selectionDeadline: selectionDeadline ? new Date(selectionDeadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      deadline: selectionDeadline ? new Date(selectionDeadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Fixed: use 'deadline' not 'selectionDeadline'
       prerequisites: prerequisites || [],
       futureOptions: futureOptions || [],
+      maxStudents: req.body.maxStudents || 50,
+      enrolledStudents: 0,
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date()
@@ -516,6 +536,55 @@ app.delete('/api/electives/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: 'Failed to delete elective',
+      details: error.message 
+    });
+  }
+});
+
+// Select elective (Student only)
+app.post('/api/electives/select/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ error: 'Student access required' });
+    }
+
+    const electiveId = req.params.id;
+    const elective = await Elective.findById(electiveId);
+
+    if (!elective) {
+      return res.status(404).json({ error: 'Elective not found' });
+    }
+
+    // Check if deadline has passed
+    const now = new Date();
+    if (elective.deadline && elective.deadline < now) {
+      return res.status(400).json({ 
+        error: 'Selection deadline has passed',
+        deadline: elective.deadline 
+      });
+    }
+
+    // Check if elective is full
+    if (elective.enrolledStudents >= elective.maxStudents) {
+      return res.status(400).json({ error: 'Elective is full' });
+    }
+
+    // Add student to elective (you may want to create a separate StudentElective model)
+    elective.enrolledStudents = (elective.enrolledStudents || 0) + 1;
+    await elective.save();
+
+    console.log(`✅ Student ${req.user.userId} selected elective ${elective.name}`);
+    
+    res.json({
+      success: true,
+      message: 'Elective selected successfully',
+      elective: elective
+    });
+  } catch (error) {
+    console.error('❌ Error selecting elective:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to select elective',
       details: error.message 
     });
   }

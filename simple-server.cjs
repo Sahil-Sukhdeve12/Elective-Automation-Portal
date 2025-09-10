@@ -522,7 +522,7 @@ app.delete('/api/electives/:id', authenticateToken, async (req, res) => {
 });
 
 // Handle React Router - serve index.html for all non-API routes
-app.get('*', (req, res) => {
+app.use((req, res, next) => {
   // Only serve React app for non-API routes
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));

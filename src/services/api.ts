@@ -1,5 +1,6 @@
-// API Base URL - Uses environment variable or falls back to deployed backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:5000/api' : 'https://elective-selection-system.onrender.com/api');
+// API Base URL - Force production URL for deployment
+const API_BASE_URL = 'https://elective-selection-system.onrender.com/api';
+console.log('🌐 API_BASE_URL configured as:', API_BASE_URL);
 
 // Types
 export interface User {

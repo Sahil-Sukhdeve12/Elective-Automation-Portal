@@ -70,7 +70,7 @@ const User = mongoose.model('User', userSchema);
 // Elective schema
 const electiveSchema = new mongoose.Schema({
   name: String,
-  code: String,
+  code: { type: String, unique: true, required: true }, // Make code unique and required
   department: String,
   semester: Number,
   credits: Number,
@@ -367,6 +367,48 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// Delete user (Admin only)
+app.delete('/api/auth/users/:id', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin role required.' });
+    }
+
+    const { id } = req.params;
+
+    // Validate ObjectId
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const deletedUser = await User.findByIdAndDelete(id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Also delete related student electives if user was a student
+    if (deletedUser.role === 'student') {
+      await StudentElective.deleteMany({ studentId: id });
+    }
+
+    console.log('✅ User deleted successfully:', deletedUser._id);
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Delete user error:', error);
+    res.status(500).json({
+      error: 'Failed to delete user',
+      details: error.message
+    });
+  }
+});
+
 // Get all electives
 app.get('/api/electives', async (req, res) => {
   try {
@@ -461,6 +503,20 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error creating elective:', error);
+    
+    // Handle duplicate key error specifically
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
+      const value = error.keyValue ? error.keyValue[field] : 'unknown';
+      
+      return res.status(400).json({ 
+        success: false,
+        error: `Duplicate ${field}`,
+        message: `An elective with ${field} "${value}" already exists. Please use a different ${field}.`,
+        details: error.message 
+      });
+    }
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to create elective',

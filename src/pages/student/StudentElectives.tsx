@@ -13,7 +13,8 @@ const StudentElectives: React.FC = () => {
     getTracksByDepartment,
     isElectiveSelectionOpen,
     getElectiveEnrollmentCount,
-    isElectiveAvailable
+    isElectiveAvailable,
+    getElectiveDeadline
   } = useData();
   const { addNotification } = useNotifications();
   
@@ -235,6 +236,8 @@ const StudentElectives: React.FC = () => {
             const enrollmentCount = getElectiveEnrollmentCount(elective.id);
             const isSelectionOpen = isElectiveSelectionOpen(elective.id);
             const availability = isElectiveAvailable(elective.id);
+            const deadline = getElectiveDeadline(elective.id);
+            const isDeadlinePassed = deadline ? new Date() > new Date(deadline) : false;
             
             return (
               <div key={elective.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow overflow-hidden">
@@ -289,6 +292,25 @@ const StudentElectives: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Deadline Info */}
+                  {deadline && (
+                    <div className={`mb-4 p-3 rounded border ${
+                      isDeadlinePassed ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="flex items-center text-sm">
+                        <Clock className={`w-4 h-4 mr-2 ${
+                          isDeadlinePassed ? 'text-red-500' : 'text-yellow-600'
+                        }`} />
+                        <span className={isDeadlinePassed ? 'text-red-700' : 'text-yellow-700'}>
+                          {isDeadlinePassed 
+                            ? `Selection deadline passed: ${new Date(deadline).toLocaleDateString()}`
+                            : `Selection deadline: ${new Date(deadline).toLocaleDateString()}`
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Track Info */}
                   <div className="mb-4">

@@ -2,16 +2,32 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import type { Elective } from '../../contexts/DataContext';
-import { Map, Book, Users, Globe, CheckCircle, Clock, Target, Info } from 'lucide-react';
+import { Map, Book, Users, Globe, CheckCircle, Clock, Target, Info, FileText, ExternalLink } from 'lucide-react';
 
 const StudentRoadmap: React.FC = () => {
   const { user } = useAuth();
   const { 
     electives, 
-    getStudentElectives 
+    getStudentElectives,
+    getSyllabus,
+    getElectiveDeadline
   } = useData();
   
   const [selectedCategory, setSelectedCategory] = useState<string>('Departmental');
+
+  const handleViewSyllabus = async (electiveCode: string) => {
+    try {
+      const syllabusData = await getSyllabus(electiveCode);
+      if (syllabusData?.pdfUrl) {
+        window.open(syllabusData.pdfUrl, '_blank');
+      } else {
+        alert('Syllabus not available for this elective');
+      }
+    } catch (error) {
+      console.error('Error viewing syllabus:', error);
+      alert('Unable to load syllabus');
+    }
+  };
 
   if (!user || user.role !== 'student') return null;
 
@@ -199,6 +215,8 @@ const StudentRoadmap: React.FC = () => {
                 {semesterElectives.map((elective) => {
                   const isCompleted = isElectiveCompleted(elective.id);
                   const canTake = canTakeElective(elective);
+                  const deadline = getElectiveDeadline(elective.id);
+                  const isDeadlinePassed = deadline ? new Date() > new Date(deadline) : false;
 
                   return (
                     <div
@@ -206,7 +224,7 @@ const StudentRoadmap: React.FC = () => {
                       className={`p-4 rounded-lg border-2 transition-all ${
                         isCompleted 
                           ? 'bg-green-50 border-green-200' 
-                          : canTake 
+                          : canTake && !isDeadlinePassed
                             ? 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md' 
                             : 'bg-gray-50 border-gray-200 opacity-60'
                       }`}
@@ -231,6 +249,33 @@ const StudentRoadmap: React.FC = () => {
                         <p className="text-xs text-gray-600 mt-2 line-clamp-2">
                           {elective.description}
                         </p>
+                      )}
+
+                      {/* Syllabus Button */}
+                      <div className="mt-2">
+                        <button
+                          onClick={() => handleViewSyllabus(elective.code)}
+                          className="flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors"
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          View Syllabus
+                          <ExternalLink className="w-2 h-2 ml-1" />
+                        </button>
+                      </div>
+
+                      {/* Deadline Display */}
+                      {deadline && (
+                        <div className={`mt-2 flex items-center gap-1 text-xs ${
+                          isDeadlinePassed ? 'text-red-500' : 'text-orange-600'
+                        }`}>
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            {isDeadlinePassed 
+                              ? `Deadline passed: ${new Date(deadline).toLocaleDateString()}`
+                              : `Deadline: ${new Date(deadline).toLocaleDateString()}`
+                            }
+                          </span>
+                        </div>
                       )}
 
                       {!isCompleted && !canTake && (

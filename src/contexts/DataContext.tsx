@@ -268,6 +268,8 @@ interface DataContextType {
   updateElective: (id: string, elective: Partial<Elective>) => Promise<boolean>;
   deleteElective: (id: string) => Promise<boolean>;
   refreshElectives: () => Promise<boolean>;
+  refreshUsers: () => Promise<boolean>;
+  deleteUser: (userId: string) => Promise<boolean>;
   getRecommendations: (studentId: string, semester: number) => Elective[];
   getElectiveRecommendation: (studentId: string, userPreferences: { interests: string[]; careerGoals: string; difficulty: string }) => Elective[];
   getAvailableDepartments: () => string[];
@@ -1873,6 +1875,62 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshUsers = async (): Promise<boolean> => {
+    try {
+      const refreshedUsers = await fetchUsers();
+      if (refreshedUsers.length >= 0) {
+        // Update localStorage since users don't have React state
+        localStorage.setItem('users', JSON.stringify(refreshedUsers));
+        
+        // Update students state if we have it
+        const studentsData = refreshedUsers
+          .filter((user: any) => user.role === 'student')
+          .map((user: any) => ({
+            id: user._id || user.id,
+            name: user.name,
+            rollNumber: user.rollNumber || user.rollNo,
+            email: user.email,
+            department: user.department,
+            semester: user.semester,
+            section: user.section
+          }));
+        setStudents(studentsData);
+        localStorage.setItem('students', JSON.stringify(studentsData));
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error refreshing users:', error);
+      return false;
+    }
+  };
+
+  const deleteUser = async (userId: string): Promise<boolean> => {
+    try {
+      // Delete user via API
+      const response = await fetch(`${getApiBaseUrl()}/auth/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        // Refresh users data to update the local state
+        await refreshUsers();
+        return true;
+      } else {
+        console.error('Failed to delete user:', response.status);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return false;
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       electives,
@@ -1886,6 +1944,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeElective,
       submitFeedback,
       refreshElectives,
+      refreshUsers,
+      deleteUser,
       selectElective,
       getStudentElectives,
       getRecommendations,

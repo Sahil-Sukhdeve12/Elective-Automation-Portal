@@ -70,7 +70,12 @@ const User = mongoose.model('User', userSchema);
 // Elective schema
 const electiveSchema = new mongoose.Schema({
   name: String,
-  code: { type: String, unique: true, required: true }, // Make code unique and required
+  code: { 
+    type: String, 
+    required: false,
+    unique: true,
+    sparse: true // This allows multiple documents with null/undefined values
+  },
   department: String,
   semester: Number,
   credits: Number,
@@ -473,7 +478,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
     // Create new elective
     const newElective = new Elective({
       name,
-      code,
+      code: code && code.trim() !== '' ? code.trim() : undefined, // Set to undefined if empty
       semester: parseInt(semester),
       track,
       description,

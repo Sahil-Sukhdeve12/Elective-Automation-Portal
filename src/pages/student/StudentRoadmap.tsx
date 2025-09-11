@@ -238,7 +238,9 @@ const StudentRoadmap: React.FC = () => {
                         )}
                       </div>
                       
-                      <p className="text-sm text-gray-600 mb-2">{elective.code}</p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {elective.code || 'No course code'}
+                      </p>
                       
                       <div className="flex items-center justify-between text-xs text-gray-500">
                         <span>{elective.credits} credits</span>
@@ -254,7 +256,7 @@ const StudentRoadmap: React.FC = () => {
                       {/* Syllabus Button */}
                       <div className="mt-2">
                         <button
-                          onClick={() => handleViewSyllabus(elective.code)}
+                          onClick={() => handleViewSyllabus(elective.code || elective.id)}
                           className="flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors"
                         >
                           <FileText className="w-3 h-3 mr-1" />

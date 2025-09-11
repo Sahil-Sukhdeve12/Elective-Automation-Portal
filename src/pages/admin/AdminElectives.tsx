@@ -63,7 +63,7 @@ const AdminElectives: React.FC = () => {
       setEditingElective(elective);
       setFormData({
         name: elective.name,
-        code: elective.code,
+        code: elective.code || '', // Handle optional code
         semester: elective.semester,
         track: elective.track,
         description: elective.description,
@@ -125,11 +125,11 @@ const AdminElectives: React.FC = () => {
     }
     
     // Basic validation
-    if (!formData.name || !formData.code || !formData.track || !formData.description || !formData.department) {
+    if (!formData.name || !formData.track || !formData.description || !formData.department) {
       addNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please fill in all required fields (Name, Code, Track, Description, Department).'
+        message: 'Please fill in all required fields (Name, Track, Description, Department).'
       });
       return;
     }
@@ -315,7 +315,9 @@ const AdminElectives: React.FC = () => {
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">{elective.name}</h3>
-          <p className="text-sm text-gray-600">{elective.code} • Semester {elective.semester}</p>
+          <p className="text-sm text-gray-600">
+            {elective.code ? `${elective.code} • ` : ''}Semester {elective.semester}
+          </p>
         </div>
         <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${gettrackColor(elective.track)}`}>
           {elective.track}
@@ -511,16 +513,15 @@ const AdminElectives: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Course Code *
+                    Course Code
                   </label>
                   <input
                     type="text"
                     name="code"
                     value={formData.code}
                     onChange={handleChange}
-                    required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., CS501"
+                    placeholder="e.g., CS501 (Optional)"
                   />
                 </div>
 

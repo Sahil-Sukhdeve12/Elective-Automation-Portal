@@ -113,7 +113,7 @@ export interface Student {
 export interface Elective {
   id: string;
   name: string;
-  code: string;
+  code?: string; // Make code optional
   credits: number;
   description: string;
   category: 'Departmental' | 'Open' | 'Humanities';
@@ -1422,7 +1422,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Prepare data for Excel export
       const electiveData = electives.map(e => ({
         'Elective Name': e.name,
-        'Code': e.code,
+        'Code': e.code || 'No code',
         'Semester': e.semester,
         'Track': e.track,
         'Department': e.department,
@@ -1552,7 +1552,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'electives':
         csvContent = 'ID,Name,Code,Credits,Department,Semester,Category,Track,Description\n';
         csvContent += electives.map(e => 
-          `${e.id},"${e.name}","${e.code}",${e.credits},"${e.department}",${e.semester},"${e.category}","${e.track}","${e.description}"`
+          `${e.id},"${e.name}","${e.code || 'No code'}",${e.credits},"${e.department}",${e.semester},"${e.category}","${e.track}","${e.description}"`
         ).join('\n');
         filename = `electives_${new Date().toISOString().split('T')[0]}.csv`;
         break;
@@ -1602,7 +1602,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         txtContent += '================\n\n';
         electives.forEach(e => {
           txtContent += `Name: ${e.name}\n`;
-          txtContent += `Code: ${e.code}\n`;
+          txtContent += `Code: ${e.code || 'No code'}\n`;
           txtContent += `Credits: ${e.credits}\n`;
           txtContent += `Department: ${e.department}\n`;
           txtContent += `Semester: ${e.semester}\n`;

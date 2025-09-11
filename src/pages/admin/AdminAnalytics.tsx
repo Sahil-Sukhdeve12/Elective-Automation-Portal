@@ -1,12 +1,9 @@
 import React, { useMemo } from 'react';
-import { useData } from '../../contexts/DataContext';
+import { useData, Student } from '../../contexts/DataContext';
 import { BarChart3, TrendingUp, Users, BookOpen, Award, Target, Download } from 'lucide-react';
 
 const AdminAnalytics: React.FC = () => {
-  const { electives, tracks, studentElectives } = useData();
-
-  const students = JSON.parse(localStorage.getItem('users') || '[]')
-    .filter((u: any) => u.role === 'student');
+  const { electives, tracks, studentElectives, students } = useData();
 
   const analytics = useMemo(() => {
     // track analytics
@@ -43,7 +40,7 @@ const AdminAnalytics: React.FC = () => {
     }).sort((a, b) => b.selections - a.selections);
 
     // Student engagement
-    const studentEngagement = students.map((student: any) => {
+    const studentEngagement = students.map((student: Student) => {
       const studentElectivesData = studentElectives.filter(se => se.studentId === student.id);
       const trackspread = new Set(studentElectivesData.map(se => se.track)).size;
       return {
@@ -117,9 +114,9 @@ const AdminAnalytics: React.FC = () => {
           <div className="flex items-center">
             <Users className="w-8 h-8 text-blue-600" />
             <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{analytics.activeStudents}</p>
-              <p className="text-gray-600">Active Students</p>
-              <p className="text-xs text-gray-500">of {students.length} total</p>
+              <p className="text-2xl font-bold text-gray-900">{students.length}</p>
+              <p className="text-gray-600">Total Students</p>
+              <p className="text-xs text-gray-500">{analytics.activeStudents} active</p>
             </div>
           </div>
         </div>

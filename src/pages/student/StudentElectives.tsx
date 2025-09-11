@@ -195,7 +195,9 @@ const StudentElectives: React.FC = () => {
                   <span className="text-green-600">✓</span>
                   <div className="flex-1">
                     <div className="font-medium">{elective.name}</div>
-                    <div className="text-sm text-gray-600">{elective.code} • {elective.credits} Credits</div>
+                    <div className="text-sm text-gray-600">
+                      {elective.code ? `${elective.code} • ` : ''}{elective.credits} Credits
+                    </div>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs text-white ${
                     elective.category === 'Departmental' ? 'bg-blue-500' :
@@ -259,7 +261,9 @@ const StudentElectives: React.FC = () => {
                   <div className="mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">{elective.name}</h3>
                     <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-sm text-gray-600">{elective.code} • {elective.credits} Credits</span>
+                      <span className="text-sm text-gray-600">
+                        {elective.code ? `${elective.code} • ` : ''}{elective.credits} Credits
+                      </span>
                       <span className={`px-2 py-1 rounded-full text-xs text-white ${
                         elective.category === 'Departmental' ? 'bg-blue-500' :
                         elective.category === 'Open' ? 'bg-orange-500' : 'bg-purple-500'

@@ -190,6 +190,21 @@ syllabusSchema.index({ electiveId: 1, isActive: 1 });
 
 const Syllabus = mongoose.model('Syllabus', syllabusSchema);
 
+// Password Reset Token Schema
+const passwordResetTokenSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+  token: { type: String, required: true, unique: true },
+  expiresAt: { type: Date, required: true },
+  used: { type: Boolean, default: false }
+}, {
+  timestamps: true
+});
+
+// Auto-delete expired tokens after 24 hours
+passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
+
+const PasswordResetToken = mongoose.model('PasswordResetToken', passwordResetTokenSchema);
+
 // Email Configuration
 const createEmailTransporter = () => {
   // Check if email is configured
@@ -360,6 +375,289 @@ app.post('/api/auth/register', async (req, res) => {
   } catch (error) {
     console.error('❌ Registration error:', error);
     res.status(500).json({ error: 'Internal server error during registration' });
+  }
+});
+
+// Forgot Password endpoint
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email is required' 
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user) {
+      // Don't reveal whether user exists for security
+      return res.status(200).json({ 
+        success: true, 
+        message: `If an account with ${email} exists, a password reset link has been sent.` 
+      });
+    }
+
+    // Generate crypto-secure random token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Set token expiration (30 minutes from now)
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    // Delete any existing tokens for this user
+    await PasswordResetToken.deleteMany({ userId: user._id });
+
+    // Create new reset token
+    await PasswordResetToken.create({
+      userId: user._id,
+      token: hashedToken,
+      expiresAt,
+      used: false
+    });
+
+    // Send email if transporter is configured
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    
+    if (emailTransporter) {
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+        to: user.email,
+        subject: 'Password Reset Request - Elective Selection System',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+              .content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+              .button { display: inline-block; padding: 12px 30px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+              .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+              .warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>🔐 Password Reset Request</h1>
+              </div>
+              <div class="content">
+                <p>Hello <strong>${user.name}</strong>,</p>
+                
+                <p>We received a request to reset your password for your Elective Selection System account.</p>
+                
+                <p>Click the button below to reset your password:</p>
+                
+                <div style="text-align: center;">
+                  <a href="${resetUrl}" class="button">Reset Password</a>
+                </div>
+                
+                <p>Or copy and paste this link into your browser:</p>
+                <p style="background-color: #e5e7eb; padding: 10px; word-break: break-all; font-size: 12px;">
+                  ${resetUrl}
+                </p>
+                
+                <div class="warning">
+                  <strong>⏰ Important:</strong> This link will expire in <strong>30 minutes</strong> for security reasons.
+                </div>
+                
+                <p><strong>Didn't request this?</strong></p>
+                <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
+                
+                <p>For security reasons:</p>
+                <ul>
+                  <li>Never share this link with anyone</li>
+                  <li>This link can only be used once</li>
+                  <li>We will never ask for your password via email</li>
+                </ul>
+              </div>
+              <div class="footer">
+                <p>This is an automated email from Elective Selection System</p>
+                <p>© ${new Date().getFullYear()} Elective Selection System. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      };
+
+      try {
+        await emailTransporter.sendMail(mailOptions);
+        console.log('✅ Password reset email sent to:', email);
+      } catch (emailError) {
+        console.error('❌ Failed to send reset email:', emailError);
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Failed to send reset email. Please try again later.' 
+        });
+      }
+    } else {
+      // Email not configured - log token to console for manual password reset
+      console.log('\n' + '='.repeat(80));
+      console.log('📧 EMAIL NOT CONFIGURED - MANUAL PASSWORD RESET REQUIRED');
+      console.log('='.repeat(80));
+      console.log(`User: ${user.name} (${email})`);
+      console.log(`Reset URL: ${resetUrl}`);
+      console.log(`\n⚠️  Copy the URL above and send it to the user manually`);
+      console.log(`⏰  Link expires in 30 minutes\n`);
+      console.log('='.repeat(80) + '\n');
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: `Password reset instructions have been sent to ${email}` 
+    });
+
+  } catch (error) {
+    console.error('❌ Forgot password error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'An error occurred. Please try again later.' 
+    });
+  }
+});
+
+// Reset Password endpoint
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Token and new password are required' 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    // Hash the token to match stored hash
+    const crypto = require('crypto');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find valid token
+    const resetToken = await PasswordResetToken.findOne({
+      token: hashedToken,
+      used: false,
+      expiresAt: { $gt: new Date() }
+    });
+
+    if (!resetToken) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid or expired reset token. Please request a new password reset.' 
+      });
+    }
+
+    // Find user
+    const user = await User.findById(resetToken.userId);
+    
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    user.password = hashedPassword;
+    await user.save();
+
+    // Mark token as used
+    resetToken.used = true;
+    await resetToken.save();
+
+    // Delete all reset tokens for this user
+    await PasswordResetToken.deleteMany({ userId: user._id });
+
+    console.log('✅ Password reset successful for user:', user.email);
+
+    // Send confirmation email
+    if (emailTransporter) {
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+        to: user.email,
+        subject: 'Password Changed Successfully - Elective Selection System',
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #10b981; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+              .content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+              .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+              .alert { background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>✅ Password Changed Successfully</h1>
+              </div>
+              <div class="content">
+                <p>Hello <strong>${user.name}</strong>,</p>
+                
+                <p>Your password has been successfully changed for your Elective Selection System account.</p>
+                
+                <p><strong>Account Details:</strong></p>
+                <ul>
+                  <li>Email: ${user.email}</li>
+                  <li>Changed at: ${new Date().toLocaleString()}</li>
+                </ul>
+                
+                <div class="alert">
+                  <strong>⚠️ Didn't make this change?</strong><br>
+                  If you didn't change your password, please contact your administrator immediately as your account may be compromised.
+                </div>
+                
+                <p>You can now log in with your new password.</p>
+              </div>
+              <div class="footer">
+                <p>This is an automated email from Elective Selection System</p>
+                <p>© ${new Date().getFullYear()} Elective Selection System. All rights reserved.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+      };
+
+      try {
+        await emailTransporter.sendMail(mailOptions);
+        console.log('✅ Password change confirmation email sent to:', user.email);
+      } catch (emailError) {
+        console.error('❌ Failed to send confirmation email:', emailError);
+        // Don't fail the request if confirmation email fails
+      }
+    }
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Password has been reset successfully. You can now log in with your new password.' 
+    });
+
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'An error occurred. Please try again later.' 
+    });
   }
 });
 
@@ -1874,8 +2172,42 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+
+// Initialize database with default admin on first run
+async function initializeDatabase() {
+  try {
+    // Check if any admin user exists
+    const adminExists = await User.findOne({ role: 'admin' });
+    
+    if (!adminExists) {
+      console.log('\n' + '='.repeat(80));
+      console.log('🔧 FIRST TIME SETUP - Creating default admin account');
+      console.log('='.repeat(80));
+      
+      // Create default admin
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await User.create({
+        name: 'System Administrator',
+        email: 'admin@college.edu',
+        password: hashedPassword,
+        role: 'admin',
+        createdAt: new Date()
+      });
+      
+      console.log('✅ Default admin created successfully!\n');
+      console.log('📧 Email: admin@college.edu');
+      console.log('🔑 Password: admin123');
+      console.log('\n⚠️  IMPORTANT: Change this password after first login!');
+      console.log('='.repeat(80) + '\n');
+    }
+  } catch (error) {
+    console.error('❌ Database initialization error:', error);
+  }
+}
+
+app.listen(PORT, async () => {
   console.log(`🚀 Authentication server running on port ${PORT}`);
+  await initializeDatabase();
 });
 
 module.exports = app;

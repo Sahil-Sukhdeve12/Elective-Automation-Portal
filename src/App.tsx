@@ -27,6 +27,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 // Authentication pages (public routes)
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ResetPassword from './pages/ResetPassword';
 
 // Student pages (protected routes for student role)
 import StudentElectiveSelection from './pages/student/StudentElectiveSelection';
@@ -153,6 +154,7 @@ function AppRoutes() {
       {/* Public Routes - accessible when not logged in */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/" replace />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to="/" replace />} />
+      <Route path="/reset-password" element={!user ? <ResetPassword /> : <Navigate to="/" replace />} />
       
       {/* Home Route - redirects based on user role */}
       <Route path="/" element={

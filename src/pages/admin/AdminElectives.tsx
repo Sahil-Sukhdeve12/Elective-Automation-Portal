@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import type { Elective } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X, XCircle } from 'lucide-react';
 
 const AdminElectives: React.FC = () => {
   const { 
@@ -13,7 +13,8 @@ const AdminElectives: React.FC = () => {
     deleteElective, 
     refreshElectives,
     getAvailableDepartments,
-    getAvailableSemesters 
+    getAvailableSemesters,
+    getAvailableCategories
   } = useData();
   const { addNotification } = useNotifications();
   
@@ -61,6 +62,26 @@ const AdminElectives: React.FC = () => {
   const handleOpenModal = (elective?: Elective) => {
     if (elective) {
       setEditingElective(elective);
+      
+      // Log enrollment values for debugging
+      console.log('📝 Opening edit modal for:', elective.name);
+      console.log('   minEnrollment from DB:', elective.minEnrollment);
+      console.log('   maxEnrollment from DB:', elective.maxEnrollment);
+      
+      // Format deadline for date input field
+      let formattedDeadline = '';
+      if (elective.deadline) {
+        const deadlineDate = typeof elective.deadline === 'string' ? new Date(elective.deadline) : elective.deadline;
+        if (!isNaN(deadlineDate.getTime())) {
+          formattedDeadline = deadlineDate.toISOString().split('T')[0];
+        }
+      } else if (elective.selectionDeadline) {
+        const deadlineDate = new Date(elective.selectionDeadline);
+        if (!isNaN(deadlineDate.getTime())) {
+          formattedDeadline = deadlineDate.toISOString().split('T')[0];
+        }
+      }
+      
       setFormData({
         name: elective.name,
         code: elective.code || '', // Handle optional code
@@ -71,16 +92,19 @@ const AdminElectives: React.FC = () => {
         prerequisites: elective.prerequisites || [],
         department: elective.department || '',
         category: 'Theory',
-        electiveCategory: elective.category as 'Humanities' | 'Departmental' | 'Open',
+        electiveCategory: (elective.category && elective.category.length > 0 ? elective.category[0] : 'Departmental') as 'Humanities' | 'Departmental' | 'Open',
         subjectType: elective.subjectType || 'Theory',
         offeredBy: elective.offeredBy || '',
         eligibleDepartments: elective.eligibleDepartments || [],
         infoImage: elective.image || '',
-        selectionDeadline: elective.selectionDeadline || '',
+        selectionDeadline: formattedDeadline,
         futureOptions: [],
-        minEnrollment: 5,
-        maxEnrollment: 40
+        minEnrollment: elective.minEnrollment || 5,
+        maxEnrollment: elective.maxEnrollment || 40
       });
+      
+      console.log('   Setting form minEnrollment to:', elective.minEnrollment || 5);
+      console.log('   Setting form maxEnrollment to:', elective.maxEnrollment || 40);
     } else {
       setEditingElective(null);
       setFormData({
@@ -125,11 +149,11 @@ const AdminElectives: React.FC = () => {
     }
     
     // Basic validation
-    if (!formData.name || !formData.track || !formData.description || !formData.department) {
+    if (!formData.name || !formData.track || !formData.department) {
       addNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please fill in all required fields (Name, Track, Description, Department).'
+        message: 'Please fill in all required fields (Name, Track, Department).'
       });
       return;
     }
@@ -165,12 +189,20 @@ const AdminElectives: React.FC = () => {
       credits: formData.credits,
       prerequisites: formData.prerequisites,
       department: formData.department,
-      category: electiveCategory,
-      electiveCategory: 'Elective' as const,
+      category: [formData.electiveCategory], // Send as array with selected category
+      electiveCategory: 'Elective' as const, // Always 'Elective' for this type
       subjectType: formData.subjectType,
       image: formData.infoImage || undefined, // Include the image
-      deadline: formData.selectionDeadline || undefined, // Fixed: use 'deadline' to match backend schema
+      deadline: formData.selectionDeadline === '' ? '' : (formData.selectionDeadline || undefined), // Send empty string to clear, or the date, or undefined
+      minEnrollment: formData.minEnrollment !== undefined && formData.minEnrollment !== null ? formData.minEnrollment : undefined,
+      maxEnrollment: formData.maxEnrollment !== undefined && formData.maxEnrollment !== null ? formData.maxEnrollment : undefined
     };
+    
+    console.log('📤 Sending elective data:', electiveData);
+    console.log('   minEnrollment being sent:', electiveData.minEnrollment);
+    console.log('   maxEnrollment being sent:', electiveData.maxEnrollment);
+    console.log('   deadline being sent:', electiveData.deadline);
+    console.log('📋 Category from form:', formData.electiveCategory);
     
     let success = false;
     if (editingElective) {
@@ -234,9 +266,11 @@ const AdminElectives: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
+      // Convert number fields to integers
+      const numberFields = ['semester', 'credits', 'minEnrollment', 'maxEnrollment'];
       const newData = {
         ...prev,
-        [name]: name === 'semester' || name === 'credits' ? parseInt(value) : value
+        [name]: numberFields.includes(name) ? parseInt(value) || 0 : value
       };
       
       // Clear track when department or elective category changes
@@ -267,6 +301,13 @@ const AdminElectives: React.FC = () => {
           : [...currentDepts, department]
       };
     });
+  };
+
+  const handleClearDeadline = () => {
+    setFormData(prev => ({
+      ...prev,
+      selectionDeadline: ''
+    }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -327,7 +368,7 @@ const AdminElectives: React.FC = () => {
       <p className="text-gray-700 mb-3 text-sm">{elective.description}</p>
 
       {/* Multi-department info for Open electives */}
-      {elective.category === 'Open' && (elective.offeredBy || elective.eligibleDepartments) && (
+      {elective.category && elective.category.includes('Open') && (elective.offeredBy || elective.eligibleDepartments) && (
         <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded">
           {elective.offeredBy && (
             <p className="text-xs text-green-700 mb-1">
@@ -343,16 +384,75 @@ const AdminElectives: React.FC = () => {
       )}
 
       <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-        <span>{elective.credits} Credits</span>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <span>{elective.credits} Credits</span>
           {elective.subjectType && (
-            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-              {elective.subjectType}
-            </span>
+            <>
+              <span className="text-gray-400">•</span>
+              <span className="font-medium text-purple-700">{elective.subjectType}</span>
+            </>
           )}
-          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{elective.electiveCategory}</span>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {/* Display all categories as badges */}
+          {elective.category && elective.category.map((cat, idx) => (
+            <span key={idx} className={`text-xs px-2 py-1 rounded ${
+              cat === 'Departmental' ? 'bg-blue-100 text-blue-800' :
+              cat === 'Open' ? 'bg-green-100 text-green-800' :
+              'bg-orange-100 text-orange-800'
+            }`}>
+              {cat}
+            </span>
+          ))}
+          {(!elective.category || elective.category.length === 0) && (
+            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Departmental</span>
+          )}
         </div>
       </div>
+
+      {/* Enrollment Information */}
+      <div className="mb-3 p-2 bg-gray-100 rounded-md">
+        <div className="flex justify-between text-xs text-gray-700">
+          <div>
+            <span className="font-medium">Min:</span> {elective.minEnrollment ?? 5}
+          </div>
+          <div>
+            <span className="font-medium">Enrolled:</span> {elective.enrolledStudents ?? 0}
+          </div>
+          <div>
+            <span className="font-medium">Max:</span> {elective.maxEnrollment ?? elective.maxStudents ?? 40}
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+          <div 
+            className={`h-2 rounded-full ${
+              (elective.enrolledStudents ?? 0) >= (elective.maxEnrollment ?? elective.maxStudents ?? 40) 
+                ? 'bg-red-500' 
+                : (elective.enrolledStudents ?? 0) >= (elective.minEnrollment ?? 5)
+                ? 'bg-green-500'
+                : 'bg-yellow-500'
+            }`}
+            style={{ 
+              width: `${Math.min(100, ((elective.enrolledStudents ?? 0) / (elective.maxEnrollment ?? elective.maxStudents ?? 40)) * 100)}%` 
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Deadline Information */}
+      {(elective.deadline || elective.selectionDeadline) && (
+        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
+          <p className="text-xs text-blue-700">
+            <span className="font-medium">Deadline:</span>{' '}
+            {new Date(elective.deadline || elective.selectionDeadline!).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })}
+          </p>
+        </div>
+      )}
 
       <div className="flex space-x-2">
         <button
@@ -555,7 +655,7 @@ const AdminElectives: React.FC = () => {
                   >
                     <option value="Theory">Theory</option>
                     <option value="Practical">Practical</option>
-                    <option value="Theory+Practical">Theory + Practical</option>
+                    <option value="Theory+Practical">Theory+Practical</option>
                   </select>
                 </div>
 
@@ -575,6 +675,29 @@ const AdminElectives: React.FC = () => {
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Elective Category *
+                  </label>
+                  <select
+                    name="electiveCategory"
+                    value={formData.electiveCategory}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Category</option>
+                    {getAvailableCategories().map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {formData.electiveCategory === 'Departmental' && 'Core technical courses for your department'}
+                    {formData.electiveCategory === 'Open' && 'Interdisciplinary courses from any department'}
+                    {formData.electiveCategory === 'Humanities' && 'Soft skills and liberal arts courses'}
+                  </p>
                 </div>
 
                 {/* Open Elective specific fields */}
@@ -704,16 +827,15 @@ const AdminElectives: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
+                  Description
                 </label>
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  required
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Brief description of the elective..."
+                  placeholder="Brief description of the elective (optional)..."
                 />
               </div>
 
@@ -721,13 +843,26 @@ const AdminElectives: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Selection Deadline
                 </label>
-                <input
-                  type="datetime-local"
-                  name="selectionDeadline"
-                  value={formData.selectionDeadline}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    name="selectionDeadline"
+                    value={formData.selectionDeadline}
+                    onChange={handleChange}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {formData.selectionDeadline && (
+                    <button
+                      type="button"
+                      onClick={handleClearDeadline}
+                      className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-colors flex items-center gap-1"
+                      title="Clear deadline"
+                    >
+                      <XCircle className="w-4 h-4" />
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

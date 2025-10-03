@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData, Elective } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Book, Users, Globe, ArrowRight, Info, Check, BookOpen, Calendar, Clock } from 'lucide-react';
+import { Book, Users, Globe, ArrowRight, Info, Check, BookOpen, Clock } from 'lucide-react';
 
 const StudentElectiveSelection: React.FC = () => {
   const { user } = useAuth();
@@ -14,7 +14,8 @@ const StudentElectiveSelection: React.FC = () => {
     getStudentElectives,
     getAvailableCategories,
     isElectiveSelectionOpen,
-    isElectiveAvailable
+    isElectiveAvailable,
+    getElectiveLimit
   } = useData();
   const { addNotification } = useNotifications();
   
@@ -22,6 +23,8 @@ const StudentElectiveSelection: React.FC = () => {
   const [selectedTrack, setSelectedTrack] = useState<string>('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedElectiveInfo, setSelectedElectiveInfo] = useState<Elective | null>(null);
+  const [electiveLimits, setElectiveLimits] = useState<Record<string, number>>({});
+  const [totalElectiveLimit, setTotalElectiveLimit] = useState<number>(3); // Default to 3
 
   // Calculate the semester for elective selection (next semester)
   const currentSemester = user?.semester || 1;
@@ -34,6 +37,14 @@ const StudentElectiveSelection: React.FC = () => {
     return allStudentElectives.filter(se => se.semester === electiveSelectionSemester);
   }, [user, getStudentElectives, electiveSelectionSemester]);
 
+  // Get student's current track from their previous elective selections
+  const studentTrack = useMemo(() => {
+    if (!user) return null;
+    const allStudentElectives = getStudentElectives(user.id);
+    // Get track from first selection (students typically follow one track)
+    return allStudentElectives.length > 0 ? allStudentElectives[0].track : null;
+  }, [user, getStudentElectives]);
+
   // Get admin-configured categories
   const availableCategories = getAvailableCategories();
 
@@ -42,12 +53,35 @@ const StudentElectiveSelection: React.FC = () => {
     const categories = new Set<string>();
     selectedElectivesThisSemester.forEach(selection => {
       const elective = electives.find(e => e.id === selection.electiveId);
-      if (elective) {
-        categories.add(elective.category);
+      if (elective && elective.category) {
+        // Handle category as array
+        elective.category.forEach(cat => categories.add(cat));
       }
     });
     return categories;
   }, [selectedElectivesThisSemester, electives]);
+
+  // Fetch elective limits from backend
+  React.useEffect(() => {
+    const fetchLimits = async () => {
+      if (!user || !user.department) return;
+      
+      const limits: Record<string, number> = {};
+      let total = 0;
+      
+      // Fetch limit for each category
+      for (const category of availableCategories) {
+        const limit = await getElectiveLimit(user.department, electiveSelectionSemester, category);
+        limits[category] = limit;
+        total += limit;
+      }
+      
+      setElectiveLimits(limits);
+      setTotalElectiveLimit(total || 3); // Fallback to 3 if no limits configured
+    };
+    
+    fetchLimits();
+  }, [user, availableCategories, electiveSelectionSemester, getElectiveLimit]);
 
   if (!user) return null;
 
@@ -146,12 +180,14 @@ const StudentElectiveSelection: React.FC = () => {
     const elective = electives.find(e => e.id === electiveId);
     if (!elective) return;
 
-    // Check if already selected this category
-    if (!canSelectFromCategory(elective.category)) {
+    // Check if already selected any category from this elective's categories
+    const hasConflict = elective.category.some(cat => !canSelectFromCategory(cat));
+    if (hasConflict) {
+      const conflictingCategory = elective.category.find(cat => !canSelectFromCategory(cat));
       addNotification({
         type: 'warning',
         title: 'Category Already Selected',
-        message: `You have already selected an elective from the ${elective.category} category for this semester.`
+        message: `You have already selected an elective from the ${conflictingCategory} category for this semester.`
       });
       return;
     }
@@ -234,7 +270,7 @@ const StudentElectiveSelection: React.FC = () => {
             </p>
             <div className="mt-4 p-4 bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-blue-800 dark:text-blue-200">
-                You can select one elective from each category (up to 3 total). Currently selected: {selectedCategories.size}/3
+                You can select one elective from each category (up to {totalElectiveLimit} total). Currently selected: {selectedCategories.size}/{totalElectiveLimit}
               </p>
             </div>
           </div>
@@ -299,16 +335,18 @@ const StudentElectiveSelection: React.FC = () => {
                         <h4 className="font-semibold text-gray-900 dark:text-white">{elective.name}</h4>
                         <Check className="w-5 h-5 text-green-600" />
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap gap-1">
                         <p className="text-sm text-gray-600 dark:text-gray-300">
                           {elective.code} • {elective.credits} Credits • {elective.track}
                         </p>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
-                          elective.category === 'Departmental' ? 'bg-blue-500' :
-                          elective.category === 'Humanities' ? 'bg-purple-500' : 'bg-green-500'
-                        }`}>
-                          {elective.category}
-                        </span>
+                        {elective.category && elective.category.map((cat, idx) => (
+                          <span key={idx} className={`px-2 py-1 rounded-full text-xs font-medium text-white ${
+                            cat === 'Departmental' ? 'bg-blue-500' :
+                            cat === 'Humanities' ? 'bg-purple-500' : 'bg-green-500'
+                          }`}>
+                            {cat}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   );
@@ -385,7 +423,7 @@ const StudentElectiveSelection: React.FC = () => {
         <div className="grid gap-6">
           {availableElectives.map((elective) => {
             const alreadySelected = selectedElectivesThisSemester.some(se => se.electiveId === elective.id);
-            const categorySelected = !canSelectFromCategory(elective.category);
+            const categorySelected = elective.category.some(cat => !canSelectFromCategory(cat));
             const availability = isElectiveAvailable(elective.id);
             const selectionOpen = isElectiveSelectionOpen ? isElectiveSelectionOpen(elective.id) : true;
             
@@ -412,6 +450,11 @@ const StudentElectiveSelection: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{elective.name}</h3>
+                        {studentTrack && elective.track === studentTrack && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                            ⭐ Recommended
+                          </span>
+                        )}
                         <button
                           onClick={() => handleShowInfo(elective)}
                           className="p-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
@@ -443,6 +486,29 @@ const StudentElectiveSelection: React.FC = () => {
                   
                   <p className="text-gray-600 dark:text-gray-300 mb-4">{elective.description}</p>
                   
+                  {/* Deadline Display - Always visible */}
+                  {(elective.deadline || elective.selectionDeadline) && (
+                    <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm font-medium text-blue-900 dark:text-blue-300">Deadline: </span>
+                        <span className={`text-sm font-semibold ${
+                          selectionOpen 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {new Date(elective.deadline || elective.selectionDeadline!).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {elective.prerequisites && elective.prerequisites.length > 0 && (
                     <div className="mb-4">
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Prerequisites: </span>
@@ -453,7 +519,7 @@ const StudentElectiveSelection: React.FC = () => {
                   )}
 
                   {/* Multi-department info for Open electives */}
-                  {elective.category === 'Open' && (elective.offeredBy || (elective.eligibleDepartments && elective.eligibleDepartments.length > 0)) && (
+                  {elective.category && elective.category.includes('Open') && (elective.offeredBy || (elective.eligibleDepartments && elective.eligibleDepartments.length > 0)) && (
                     <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       {elective.offeredBy && (
                         <div className="mb-1">
@@ -494,6 +560,49 @@ const StudentElectiveSelection: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Enrollment Status */}
+                  {elective.maxEnrollment && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enrollment:</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-sm font-medium ${
+                            (elective.enrolledStudents || 0) >= elective.maxEnrollment 
+                              ? 'text-red-600 dark:text-red-400' 
+                              : (elective.enrolledStudents || 0) / elective.maxEnrollment >= 0.8
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-green-600 dark:text-green-400'
+                          }`}>
+                            {elective.enrolledStudents || 0} / {elective.maxEnrollment}
+                          </span>
+                          {(elective.enrolledStudents || 0) >= elective.maxEnrollment && (
+                            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs rounded-full font-medium">
+                              Full
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            (elective.enrolledStudents || 0) >= elective.maxEnrollment 
+                              ? 'bg-red-500' 
+                              : (elective.enrolledStudents || 0) / elective.maxEnrollment >= 0.8
+                              ? 'bg-amber-500'
+                              : 'bg-green-500'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(((elective.enrolledStudents || 0) / elective.maxEnrollment) * 100, 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="flex items-center justify-between mb-4">
                     <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -510,9 +619,16 @@ const StudentElectiveSelection: React.FC = () => {
                   <div className="flex justify-end">
                     <button
                       onClick={() => handleElectiveSelect(elective.id)}
-                      disabled={alreadySelected || categorySelected || !availability.available || !selectionOpen}
+                      disabled={
+                        alreadySelected || 
+                        categorySelected || 
+                        !availability.available || 
+                        !selectionOpen ||
+                        !!(elective.maxEnrollment && (elective.enrolledStudents || 0) >= elective.maxEnrollment)
+                      }
                       className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        alreadySelected || categorySelected || !availability.available || !selectionOpen
+                        alreadySelected || categorySelected || !availability.available || !selectionOpen || 
+                        (elective.maxEnrollment && (elective.enrolledStudents || 0) >= elective.maxEnrollment)
                           ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       }`}
@@ -521,6 +637,7 @@ const StudentElectiveSelection: React.FC = () => {
                        categorySelected ? 'Category Selected' :
                        !availability.available ? 'Not Available' :
                        !selectionOpen ? 'Registration Closed' :
+                       (elective.maxEnrollment && (elective.enrolledStudents || 0) >= elective.maxEnrollment) ? 'Enrollment Full' :
                        'Select Elective'}
                     </button>
                   </div>

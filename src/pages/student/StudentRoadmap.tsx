@@ -1,25 +1,32 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
-import type { Elective } from '../../contexts/DataContext';
-import { Map, Book, Users, Globe, CheckCircle, Clock, Target, Info, FileText, ExternalLink } from 'lucide-react';
+import { Map, FileText, Download, BookOpen } from 'lucide-react';
 
 const StudentRoadmap: React.FC = () => {
   const { user } = useAuth();
   const { 
-    electives, 
-    getStudentElectives,
     getSyllabus,
-    getElectiveDeadline
+    getAllSyllabi,
+    electives
   } = useData();
-  
-  const [selectedCategory, setSelectedCategory] = useState<string>('Departmental');
 
-  const handleViewSyllabus = async (electiveCode: string) => {
+  const handleViewSyllabus = async (electiveId: string) => {
     try {
-      const syllabusData = await getSyllabus(electiveCode);
-      if (syllabusData?.pdfUrl) {
-        window.open(syllabusData.pdfUrl, '_blank');
+      const syllabusData = getSyllabus(electiveId);
+      if (syllabusData?.pdfData) {
+        // Open PDF from base64 data
+        const win = window.open('', '_blank');
+        if (win) {
+          win.document.write(`
+            <html>
+              <head><title>${syllabusData.pdfFileName}</title></head>
+              <body style="margin:0">
+                <embed width="100%" height="100%" src="${syllabusData.pdfData}" type="application/pdf" />
+              </body>
+            </html>
+          `);
+        }
       } else {
         alert('Syllabus not available for this elective');
       }
@@ -29,89 +36,13 @@ const StudentRoadmap: React.FC = () => {
     }
   };
 
+  // Get complete syllabus document
+  const completeSyllabus = getAllSyllabi().find(s => s.electiveId === 'COMPLETE_SYLLABUS');
+  
+  // Get all individual elective syllabi (excluding complete syllabus)
+  const electiveSyllabi = getAllSyllabi().filter(s => s.electiveId !== 'COMPLETE_SYLLABUS');
+
   if (!user || user.role !== 'student') return null;
-
-  const studentElectives = getStudentElectives(user.id);
-  const currentSemester = user.semester || 5;
-
-  // Category configuration
-  const categoryConfig = {
-    'Departmental': {
-      title: 'Departmental Electives',
-      icon: Book,
-      color: 'bg-blue-500',
-      borderColor: 'border-blue-500',
-      textColor: 'text-blue-600',
-      bgLight: 'bg-blue-50',
-      description: 'Core technical courses in your specialization',
-      requirement: 4
-    },
-    'Humanities': {
-      title: 'Humanities Electives',
-      icon: Users,
-      color: 'bg-purple-500',
-      borderColor: 'border-purple-500',
-      textColor: 'text-purple-600',
-      bgLight: 'bg-purple-50',
-      description: 'Soft skills and liberal arts courses',
-      requirement: 2
-    },
-    'Open': {
-      title: 'Open Electives',
-      icon: Globe,
-      color: 'bg-green-500',
-      borderColor: 'border-green-500',
-      textColor: 'text-green-600',
-      bgLight: 'bg-green-50',
-      description: 'Interdisciplinary courses from any department',
-      requirement: 2
-    }
-  };
-
-  const categories = Object.keys(categoryConfig) as Array<keyof typeof categoryConfig>;
-
-  // Get electives for selected category
-  const getElectivesForCategory = (category: string) => {
-    return electives.filter(e => e.category === category && e.department === user.department);
-  };
-
-  // Get completed electives for category
-  const getCompletedElectives = (category: string) => {
-    return studentElectives.filter(se => {
-      const elective = electives.find(e => e.id === se.electiveId);
-      return elective?.category === category;
-    });
-  };
-
-  // Group electives by semester
-  const groupElectivesBySemester = (categoryElectives: Elective[]) => {
-    const grouped = categoryElectives.reduce((acc, elective) => {
-      const semester = elective.semester;
-      if (!acc[semester]) acc[semester] = [];
-      acc[semester].push(elective);
-      return acc;
-    }, {} as Record<number, Elective[]>);
-
-    return Object.entries(grouped)
-      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-      .map(([semester, electiveList]) => ({
-        semester: parseInt(semester),
-        electives: electiveList
-      }));
-  };
-
-  const selectedCategoryData = categoryConfig[selectedCategory as keyof typeof categoryConfig];
-  const categoryElectives = getElectivesForCategory(selectedCategory);
-  const completedElectives = getCompletedElectives(selectedCategory);
-  const semesterGroups = groupElectivesBySemester(categoryElectives);
-
-  const isElectiveCompleted = (electiveId: string) => {
-    return studentElectives.some(se => se.electiveId === electiveId);
-  };
-
-  const canTakeElective = (elective: Elective) => {
-    return elective.semester <= currentSemester && !isElectiveCompleted(elective.id);
-  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -119,192 +50,163 @@ const StudentRoadmap: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
           <Map className="w-8 h-8 text-blue-600" />
-          Elective Roadmap
+          Syllabus Management
         </h1>
         <p className="text-gray-600 mt-2">
-          Plan your elective journey with a clear semester-wise view
+          View and download syllabus documents for all elective courses
         </p>
       </div>
 
-      {/* Category Tabs */}
-      <div className="mb-8">
-        <div className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">
-          {categories.map((category) => {
-            const config = categoryConfig[category];
-            const IconComponent = config.icon;
-            const completed = getCompletedElectives(category).length;
-            const required = config.requirement;
-            
-            return (
+      {/* Complete Syllabus Document */}
+      {completeSyllabus && (
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-600 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                  📚 Complete Syllabus Document
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Comprehensive syllabus for all elective courses • {completeSyllabus.pdfFileName}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Uploaded: {completeSyllabus.uploadedAt.toLocaleDateString()} • Version: {completeSyllabus.version}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`flex items-center gap-2 px-4 py-3 rounded-md font-medium transition-all ${
-                  selectedCategory === category
-                    ? `${config.color} text-white shadow-md`
-                    : 'text-gray-600 hover:bg-white hover:shadow-sm'
-                }`}
+                onClick={() => handleViewSyllabus('COMPLETE_SYLLABUS')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors flex items-center gap-2"
               >
-                <IconComponent className="w-5 h-5" />
-                <span>{config.title}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  selectedCategory === category 
-                    ? 'bg-white bg-opacity-20 text-white' 
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {completed}/{required}
-                </span>
+                <FileText className="w-4 h-4" />
+                View Document
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Category Info */}
-      <div className={`p-4 rounded-lg ${selectedCategoryData.bgLight} border ${selectedCategoryData.borderColor} mb-8`}>
-        <div className="flex items-start gap-3">
-          <Info className={`w-6 h-6 ${selectedCategoryData.textColor} mt-0.5`} />
-          <div>
-            <h3 className={`font-semibold ${selectedCategoryData.textColor}`}>
-              {selectedCategoryData.title}
-            </h3>
-            <p className="text-gray-700 mt-1">{selectedCategoryData.description}</p>
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-              <span>Required: {selectedCategoryData.requirement} electives</span>
-              <span>Completed: {completedElectives.length}</span>
-              <span>Remaining: {Math.max(0, selectedCategoryData.requirement - completedElectives.length)}</span>
+              <button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = completeSyllabus.pdfData;
+                  link.download = completeSyllabus.pdfFileName;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Electives by Semester */}
-      <div className="space-y-8">
-        {semesterGroups.map(({ semester, electives: semesterElectives }) => {
-          const isPastSemester = semester < currentSemester;
-          const isCurrentSemester = semester === currentSemester;
-
-          return (
-            <div key={semester} className="relative">
-              {/* Semester Header */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className={`flex items-center justify-center w-12 h-12 rounded-full ${
-                  isPastSemester ? 'bg-gray-500' :
-                  isCurrentSemester ? selectedCategoryData.color :
-                  'bg-gray-300'
-                } text-white font-bold`}>
-                  {semester}
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Semester {semester}
-                    {isCurrentSemester && (
-                      <span className={`ml-2 px-2 py-1 text-xs rounded-full ${selectedCategoryData.color} text-white`}>
-                        Current
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-gray-600">
-                    {semesterElectives.length} elective{semesterElectives.length !== 1 ? 's' : ''} available
-                  </p>
-                </div>
+      {/* All Elective Syllabi - Display all uploaded syllabi */}
+      {electiveSyllabi.length > 0 && (
+        <div className="mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border-2 border-purple-200 dark:border-purple-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-purple-600 p-3 rounded-lg">
+                <BookOpen className="w-6 h-6 text-white" />
               </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  📖 Elective Syllabi ({electiveSyllabi.length})
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  View and download syllabus for individual electives
+                </p>
+              </div>
+            </div>
 
-              {/* Electives Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ml-16">
-                {semesterElectives.map((elective) => {
-                  const isCompleted = isElectiveCompleted(elective.id);
-                  const canTake = canTakeElective(elective);
-                  const deadline = getElectiveDeadline(elective.id);
-                  const isDeadlinePassed = deadline ? new Date() > new Date(deadline) : false;
-
-                  return (
-                    <div
-                      key={elective.id}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        isCompleted 
-                          ? 'bg-green-50 border-green-200' 
-                          : canTake && !isDeadlinePassed
-                            ? 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-md' 
-                            : 'bg-gray-50 border-gray-200 opacity-60'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium text-gray-900 line-clamp-2">
-                          {elective.name}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {electiveSyllabi.map(syllabus => {
+                const elective = electives.find(e => e.id === syllabus.electiveId);
+                return (
+                  <div 
+                    key={syllabus.id} 
+                    className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4 hover:shadow-lg transition-all"
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="bg-purple-100 dark:bg-purple-800/50 p-2 rounded">
+                        <FileText className="w-5 h-5 text-purple-600 dark:text-purple-300" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-gray-900 dark:text-white text-sm line-clamp-2 mb-1">
+                          {elective?.name || 'Unknown Elective'}
                         </h4>
-                        {isCompleted && (
-                          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        {elective?.code && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {elective.code}
+                          </p>
                         )}
                       </div>
-                      
-                      <p className="text-sm text-gray-600 mb-2">
-                        {elective.code || 'No course code'}
-                      </p>
-                      
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{elective.credits} credits</span>
-                        <span>{elective.track}</span>
-                      </div>
+                    </div>
 
-                      {elective.description && (
-                        <p className="text-xs text-gray-600 mt-2 line-clamp-2">
-                          {elective.description}
-                        </p>
-                      )}
-
-                      {/* Syllabus Button */}
-                      <div className="mt-2">
-                        <button
-                          onClick={() => handleViewSyllabus(elective.code || elective.id)}
-                          className="flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium transition-colors"
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          View Syllabus
-                          <ExternalLink className="w-2 h-2 ml-1" />
-                        </button>
-                      </div>
-
-                      {/* Deadline Display */}
-                      {deadline && (
-                        <div className={`mt-2 flex items-center gap-1 text-xs ${
-                          isDeadlinePassed ? 'text-red-500' : 'text-orange-600'
-                        }`}>
-                          <Clock className="w-3 h-3" />
-                          <span>
-                            {isDeadlinePassed 
-                              ? `Deadline passed: ${new Date(deadline).toLocaleDateString()}`
-                              : `Deadline: ${new Date(deadline).toLocaleDateString()}`
-                            }
+                    <div className="space-y-2">
+                      {elective && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
+                            {elective.track}
+                          </span>
+                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded text-xs font-medium">
+                            Sem {elective.semester}
+                          </span>
+                          <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 rounded text-xs font-medium">
+                            {elective.credits} Credits
                           </span>
                         </div>
                       )}
 
-                      {!isCompleted && !canTake && (
-                        <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                          <Clock className="w-3 h-3" />
-                          <span>Available in future semester</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                      <div className="bg-white dark:bg-gray-800/50 rounded p-2">
+                        <p className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          {syllabus.pdfFileName}
+                        </p>
+                      </div>
 
-      {/* Empty State */}
-      {semesterGroups.length === 0 && (
-        <div className="text-center py-12">
-          <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No electives found for {selectedCategoryData.title}
-          </h3>
-          <p className="text-gray-600">
-            Electives for this category will be added by administrators.
-          </p>
+                      {syllabus.description && (
+                        <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2 italic">
+                          "{syllabus.description}"
+                        </p>
+                      )}
+
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        📅 Uploaded: {syllabus.uploadedAt.toLocaleDateString()}
+                      </p>
+
+                      <div className="flex gap-2 pt-2 border-t border-purple-200 dark:border-purple-700">
+                        <button
+                          onClick={() => handleViewSyllabus(syllabus.electiveId)}
+                          className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1"
+                        >
+                          <FileText className="w-3 h-3" />
+                          View PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = syllabus.pdfData;
+                            link.download = syllabus.pdfFileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Download className="w-3 h-3" />
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

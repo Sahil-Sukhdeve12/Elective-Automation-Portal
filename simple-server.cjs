@@ -4,6 +4,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const nodemailer = require('nodemailer');
 require('dotenv').config({ quiet: true });
 
 const app = express();
@@ -68,6 +69,11 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 
 // Elective schema
+// Validator function to limit array size
+const arrayLimit = (val) => {
+  return val.length <= 10;
+};
+
 const electiveSchema = new mongoose.Schema({
   name: String,
   code: { 
@@ -81,17 +87,129 @@ const electiveSchema = new mongoose.Schema({
   credits: Number,
   description: String,
   instructor: String,
-  maxStudents: Number,
+  maxStudents: Number, // Legacy field - keeping for backward compatibility
+  minEnrollment: Number, // Minimum students required for elective to run
+  maxEnrollment: Number, // Maximum students allowed in elective
   enrolledStudents: Number,
   image: String,
   deadline: Date,
-  category: String,
+  category: { 
+    type: [String], 
+    default: ['Departmental'],
+    validate: [arrayLimit, '{PATH} exceeds the limit of 10 categories']
+  },
   electiveCategory: String,
+  subjectType: { 
+    type: String, 
+    enum: ['Theory', 'Practical', 'Theory+Practical'],
+    default: 'Theory'
+  },
   track: String,
   createdAt: { type: Date, default: Date.now }
 });
 
 const Elective = mongoose.model('Elective', electiveSchema);
+
+// Student Elective Selection Schema
+const studentElectiveSelectionSchema = new mongoose.Schema({
+  studentId: { type: String, required: true, index: true },
+  electiveId: { type: mongoose.Schema.Types.ObjectId, ref: 'Elective', required: true },
+  semester: { type: Number, required: true },
+  category: [String], // The categories this elective belongs to
+  status: { type: String, enum: ['selected', 'confirmed', 'dropped'], default: 'selected' },
+  selectedAt: { type: Date, default: Date.now },
+  confirmedAt: Date,
+  droppedAt: Date
+}, {
+  timestamps: true
+});
+
+// Compound index to prevent duplicate selections
+studentElectiveSelectionSchema.index({ studentId: 1, electiveId: 1, semester: 1 }, { unique: true });
+
+const StudentElectiveSelection = mongoose.model('StudentElectiveSelection', studentElectiveSelectionSchema);
+
+// Track schema
+const trackSchema = new mongoose.Schema({
+  name: String,
+  department: String,
+  category: String,
+  credits: Number,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Track = mongoose.model('Track', trackSchema);
+
+// Elective Limit Schema
+const electiveLimitSchema = new mongoose.Schema({
+  department: { type: String, required: true },
+  semester: { type: Number, required: true },
+  category: { type: String, required: true },
+  maxElectives: { type: Number, required: true, default: 1 },
+  isActive: { type: Boolean, default: true },
+  createdBy: String,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+// Compound index to ensure unique limit per department/semester/category
+electiveLimitSchema.index({ department: 1, semester: 1, category: 1 }, { unique: true });
+
+const ElectiveLimit = mongoose.model('ElectiveLimit', electiveLimitSchema);
+
+// System Config schema
+const systemConfigSchema = new mongoose.Schema({
+  departments: [String],
+  semesters: [Number],
+  sections: [String],
+  electiveCategories: [String],
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const SystemConfig = mongoose.model('SystemConfig', systemConfigSchema);
+
+// Syllabus schema
+const syllabusSchema = new mongoose.Schema({
+  electiveId: { type: String, required: true, index: true },
+  title: { type: String, required: true },
+  description: String,
+  pdfData: { type: String, required: true }, // Base64 encoded PDF
+  pdfFileName: { type: String, required: true },
+  uploadedBy: { type: String, required: true },
+  uploadedAt: { type: Date, default: Date.now },
+  academicYear: String,
+  semester: Number,
+  version: { type: Number, default: 1 },
+  isActive: { type: Boolean, default: true }
+}, {
+  timestamps: true
+});
+
+// Index for quick lookup
+syllabusSchema.index({ electiveId: 1, isActive: 1 });
+
+const Syllabus = mongoose.model('Syllabus', syllabusSchema);
+
+// Email Configuration
+const createEmailTransporter = () => {
+  // Check if email is configured
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+    console.warn('⚠️ Email not configured. Email notifications will be disabled.');
+    return null;
+  }
+
+  return nodemailer.createTransporter({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASSWORD
+    }
+  });
+};
+
+const emailTransporter = createEmailTransporter();
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -140,7 +258,11 @@ app.post('/api/auth/login', async (req, res) => {
         email: user.email,
         role: user.role,
         department: user.department,
-        semester: user.semester
+        semester: user.semester,
+        section: user.section,
+        mobile: user.mobile,
+        rollNo: user.rollNo,
+        rollNumber: user.rollNumber || user.rollNo
       }
     });
   } catch (error) {
@@ -177,7 +299,7 @@ app.post('/api/auth/register', async (req, res) => {
         registrationNumber: !!registrationNumber
       });
       return res.status(400).json({ 
-        error: 'Department, semester, and registration number are required for students' 
+        error: 'Department, semester, and class roll number are required for students' 
       });
     }
 
@@ -187,12 +309,12 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // Check if registration number already exists for students
+    // Check if class roll number already exists for students
     if (role === 'student' && registrationNumber) {
       const existingRegNumber = await User.findOne({ rollNumber: registrationNumber });
       if (existingRegNumber) {
-        console.log('❌ Registration number already exists:', registrationNumber);
-        return res.status(400).json({ error: 'Registration number already exists' });
+        console.log('❌ Class roll number already exists:', registrationNumber);
+        return res.status(400).json({ error: 'Class roll number already exists' });
       }
     }
 
@@ -259,6 +381,34 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Get current authenticated user (for token verification)
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        semester: user.semester,
+        section: user.section,
+        mobile: user.mobile,
+        rollNo: user.rollNo,
+        rollNumber: user.rollNumber || user.rollNo
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching user profile:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
 // Get user profile
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
@@ -298,7 +448,17 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     console.log('🔧 Profile update request received:', req.body);
     console.log('🔧 User from token:', req.user);
     
-    const { name, department, semester, rollNo, rollNumber, mobile, section, preferences } = req.body;
+    const { 
+      name, 
+      department, 
+      semester, 
+      rollNo, 
+      rollNumber, 
+      mobile, 
+      section, 
+      preferences,
+      profile 
+    } = req.body;
     
     const updateData = {};
     if (name !== undefined) updateData.name = name;
@@ -309,6 +469,15 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     if (mobile !== undefined) updateData.mobile = mobile;
     if (section !== undefined) updateData.section = section;
     if (preferences !== undefined) updateData.preferences = preferences;
+    
+    // Handle nested profile fields
+    if (profile !== undefined) {
+      if (!updateData.profile) updateData.profile = {};
+      if (profile.year !== undefined) updateData['profile.year'] = profile.year;
+      if (profile.cgpa !== undefined) updateData['profile.cgpa'] = profile.cgpa;
+      if (profile.track !== undefined) updateData['profile.track'] = profile.track;
+      if (profile.interests !== undefined) updateData['profile.interests'] = profile.interests;
+    }
 
     console.log('🔧 Update data:', updateData);
 
@@ -338,7 +507,8 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
         rollNumber: user.rollNumber,
         mobile: user.mobile,
         section: user.section,
-        preferences: user.preferences
+        preferences: user.preferences,
+        profile: user.profile
       }
     });
   } catch (error) {
@@ -421,6 +591,11 @@ app.get('/api/electives', async (req, res) => {
     const electives = await Elective.find({});
     console.log(`✅ Found ${electives.length} electives`);
     
+    // Log categories of all electives
+    electives.forEach((elective, index) => {
+      console.log(`Elective ${index + 1}: ${elective.name} - category: ${elective.category}, electiveCategory: ${elective.electiveCategory}`);
+    });
+    
     // Add deadline status to each elective
     const electivesWithStatus = electives.map(elective => {
       const now = new Date();
@@ -455,6 +630,9 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
     }
 
     console.log('🔥 Creating new elective:', req.body);
+    console.log('📋 Category value:', req.body.category);
+    console.log('📋 ElectiveCategory value:', req.body.electiveCategory);
+    console.log('📋 SubjectType value:', req.body.subjectType);
     
     const {
       name,
@@ -466,14 +644,23 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       department,
       category,
       electiveCategory,
+      subjectType,
       image,
       deadline,
       selectionDeadline, // Support both field names
       prerequisites,
       futureOptions,
       instructor,
-      maxStudents
+      maxStudents,
+      minEnrollment,
+      maxEnrollment
     } = req.body;
+
+    console.log('📥 Received create data:', {
+      minEnrollment,
+      maxEnrollment,
+      deadline: deadline || selectionDeadline
+    });
 
     // Create new elective
     const newElective = new Elective({
@@ -484,14 +671,17 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       description,
       credits: parseInt(credits),
       department,
-      category,
+      category: Array.isArray(category) ? category : [category], // Ensure category is always an array
       electiveCategory,
+      subjectType: subjectType || 'Theory', // Default to Theory if not provided
       instructor,
       image,
-      deadline: deadline || selectionDeadline ? new Date(deadline || selectionDeadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Support both field names
+      deadline: deadline && deadline !== '' ? new Date(deadline) : (selectionDeadline && selectionDeadline !== '' ? new Date(selectionDeadline) : undefined), // Support both field names, allow null/undefined for no deadline
       prerequisites: prerequisites || [],
       futureOptions: futureOptions || [],
-      maxStudents: req.body.maxStudents || 50,
+      maxStudents: maxStudents || maxEnrollment || 50, // Support both field names, prefer maxEnrollment
+      minEnrollment: minEnrollment !== undefined ? minEnrollment : 5,
+      maxEnrollment: maxEnrollment !== undefined ? maxEnrollment : (maxStudents || 50),
       enrolledStudents: 0,
       isActive: true,
       createdAt: new Date(),
@@ -500,6 +690,14 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
 
     const savedElective = await newElective.save();
     console.log('✅ Elective created successfully:', savedElective._id);
+    console.log('✅ Saved category:', savedElective.category);
+    console.log('✅ Saved electiveCategory:', savedElective.electiveCategory);
+    console.log('✅ Saved subjectType:', savedElective.subjectType);
+    console.log('💾 Saved enrollment values:', {
+      minEnrollment: savedElective.minEnrollment,
+      maxEnrollment: savedElective.maxEnrollment,
+      deadline: savedElective.deadline
+    });
     
     res.status(201).json({
       success: true,
@@ -539,11 +737,45 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
     }
 
     const { id } = req.params;
-    console.log('🔄 Updating elective:', id, req.body);
+    console.log('🔄 Updating elective:', id);
+    console.log('📥 Full request body:', req.body);
+    console.log('📥 Received update data:', {
+      minEnrollment: req.body.minEnrollment,
+      maxEnrollment: req.body.maxEnrollment,
+      deadline: req.body.deadline,
+      types: {
+        minEnrollment: typeof req.body.minEnrollment,
+        maxEnrollment: typeof req.body.maxEnrollment,
+        deadline: typeof req.body.deadline
+      }
+    });
+    
+    // Build update object, excluding undefined values
+    const updateData = {};
+    Object.keys(req.body).forEach(key => {
+      if (req.body[key] !== undefined) {
+        // Special handling for deadline - empty string should clear it
+        if (key === 'deadline' && req.body[key] === '') {
+          updateData[key] = null;
+        } else if (key === 'deadline' && req.body[key]) {
+          updateData[key] = new Date(req.body[key]);
+        } else {
+          updateData[key] = req.body[key];
+        }
+      }
+    });
+    updateData.updatedAt = new Date();
+    
+    console.log('📝 Processed update data:', updateData);
+    console.log('📝 Enrollment values in update:', {
+      minEnrollment: updateData.minEnrollment,
+      maxEnrollment: updateData.maxEnrollment,
+      deadline: updateData.deadline
+    });
     
     const updatedElective = await Elective.findByIdAndUpdate(
       id,
-      { ...req.body, updatedAt: new Date() },
+      updateData,
       { new: true, runValidators: true }
     );
 
@@ -555,6 +787,12 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
     }
 
     console.log('✅ Elective updated successfully:', updatedElective._id);
+    console.log('💾 Saved values:', {
+      minEnrollment: updatedElective.minEnrollment,
+      maxEnrollment: updatedElective.maxEnrollment,
+      deadline: updatedElective.deadline
+    });
+    
     res.json({
       success: true,
       message: 'Elective updated successfully',
@@ -613,6 +851,9 @@ app.post('/api/electives/select/:id', authenticateToken, async (req, res) => {
     }
 
     const electiveId = req.params.id;
+    const {semester} = req.body; // Get semester from request
+    const studentId = req.user.userId;
+    
     const elective = await Elective.findById(electiveId);
 
     if (!elective) {
@@ -633,16 +874,39 @@ app.post('/api/electives/select/:id', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Elective is full' });
     }
 
-    // Add student to elective (you may want to create a separate StudentElective model)
+    // Check if student already selected this elective for this semester
+    const existingSelection = await StudentElectiveSelection.findOne({
+      studentId,
+      electiveId,
+      semester: semester || elective.semester
+    });
+
+    if (existingSelection) {
+      return res.status(400).json({ error: 'You have already selected this elective for this semester' });
+    }
+
+    // Create student selection record
+    const selection = new StudentElectiveSelection({
+      studentId,
+      electiveId,
+      semester: semester || elective.semester,
+      category: elective.category,
+      status: 'selected'
+    });
+
+    await selection.save();
+
+    // Update elective enrollment count
     elective.enrolledStudents = (elective.enrolledStudents || 0) + 1;
     await elective.save();
 
-    console.log(`✅ Student ${req.user.userId} selected elective ${elective.name}`);
+    console.log(`✅ Student ${studentId} selected elective ${elective.name} for semester ${semester || elective.semester}`);
     
     res.json({
       success: true,
       message: 'Elective selected successfully',
-      elective: elective
+      elective: elective,
+      selection: selection
     });
   } catch (error) {
     console.error('❌ Error selecting elective:', error);
@@ -651,6 +915,951 @@ app.post('/api/electives/select/:id', authenticateToken, async (req, res) => {
       error: 'Failed to select elective',
       details: error.message 
     });
+  }
+});
+
+// Get student's elective selections
+app.get('/api/student/selections', authenticateToken, async (req, res) => {
+  try {
+    const studentId = req.user.userId;
+    const { semester } = req.query;
+    
+    const query = { studentId };
+    if (semester) {
+      query.semester = parseInt(semester);
+    }
+    
+    const selections = await StudentElectiveSelection.find(query)
+      .populate('electiveId')
+      .sort({ semester: 1, selectedAt: -1 });
+    
+    console.log(`📚 Found ${selections.length} elective selections for student ${studentId}`);
+    
+    res.json({
+      success: true,
+      count: selections.length,
+      selections: selections
+    });
+  } catch (error) {
+    console.error('❌ Error fetching student selections:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch selections',
+      details: error.message 
+    });
+  }
+});
+
+// Update student track selection
+app.put('/api/student/track', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ error: 'Student access required' });
+    }
+
+    const studentId = req.user.userId;
+    const { track } = req.body;
+    
+    if (!track) {
+      return res.status(400).json({ error: 'Track is required' });
+    }
+    
+    const user = await User.findById(studentId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update track in profile
+    if (!user.profile) {
+      user.profile = {};
+    }
+    user.profile.track = track;
+    
+    await user.save();
+    
+    console.log(`✅ Updated track for student ${studentId} to ${track}`);
+    
+    res.json({
+      success: true,
+      message: 'Track updated successfully',
+      track: track
+    });
+  } catch (error) {
+    console.error('❌ Error updating student track:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to update track',
+      details: error.message 
+    });
+  }
+});
+
+// ============ TRACKS API ENDPOINTS ============
+
+// Get all tracks
+app.get('/api/tracks', async (req, res) => {
+  try {
+    console.log('🎯 Fetching tracks from database...');
+    const tracks = await Track.find({});
+    console.log(`✅ Found ${tracks.length} tracks`);
+    
+    res.json({
+      success: true,
+      count: tracks.length,
+      tracks: tracks
+    });
+  } catch (error) {
+    console.error('❌ Error fetching tracks:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch tracks' 
+    });
+  }
+});
+
+// Create new track
+app.post('/api/tracks', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { name, department, category, description, credits } = req.body;
+    
+    console.log('📝 Creating new track:', { name, department, category });
+
+    const track = new Track({
+      name,
+      department,
+      category,
+      description,
+      credits
+    });
+
+    await track.save();
+    console.log('✅ Track created successfully:', track._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Track created successfully',
+      track: track
+    });
+  } catch (error) {
+    console.error('❌ Error creating track:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create track',
+      details: error.message
+    });
+  }
+});
+
+// Update track
+app.put('/api/tracks/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const trackId = req.params.id;
+    const updates = req.body;
+
+    console.log('🔄 Updating track:', trackId);
+
+    const track = await Track.findByIdAndUpdate(
+      trackId,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!track) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Track not found' 
+      });
+    }
+
+    console.log('✅ Track updated successfully');
+
+    res.json({
+      success: true,
+      message: 'Track updated successfully',
+      track: track
+    });
+  } catch (error) {
+    console.error('❌ Error updating track:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update track',
+      details: error.message
+    });
+  }
+});
+
+// Delete track
+app.delete('/api/tracks/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const trackId = req.params.id;
+    console.log('🗑️ Deleting track:', trackId);
+
+    const track = await Track.findByIdAndDelete(trackId);
+
+    if (!track) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Track not found' 
+      });
+    }
+
+    console.log('✅ Track deleted successfully');
+
+    res.json({
+      success: true,
+      message: 'Track deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error deleting track:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete track',
+      details: error.message
+    });
+  }
+});
+
+// System Config endpoints
+// Get system configuration (public - no auth required for reading)
+app.get('/api/system-config', async (req, res) => {
+  try {
+    let config = await SystemConfig.findOne();
+    
+    // If no config exists, build it from actual database data
+    if (!config) {
+      console.log('⚙️ No system config found, building from database data...');
+      
+      // Get unique departments from students and electives
+      const students = await User.find({ role: 'student' });
+      const electives = await Elective.find();
+      
+      const departmentsFromStudents = [...new Set(students.map(s => s.department).filter(Boolean))];
+      const departmentsFromElectives = [...new Set(electives.map(e => e.department).filter(Boolean))];
+      const allDepartments = [...new Set([...departmentsFromStudents, ...departmentsFromElectives])];
+      
+      // Get unique sections and semesters from students
+      const sections = [...new Set(students.map(s => s.section).filter(Boolean))];
+      const semesters = [...new Set(students.map(s => s.semester).filter(Boolean))].sort((a, b) => a - b);
+      
+      // Get unique elective categories
+      const categories = [...new Set(electives.map(e => e.category || e.electiveCategory).filter(Boolean))];
+      
+      config = new SystemConfig({
+        departments: allDepartments.length > 0 ? allDepartments : ['Artificial Intelligence'],
+        semesters: semesters.length > 0 ? semesters : [1, 2, 3, 4, 5, 6, 7, 8],
+        sections: sections.length > 0 ? sections : ['A'],
+        electiveCategories: categories.length > 0 ? categories : ['Professional Elective', 'Open Elective']
+      });
+      await config.save();
+      console.log('✅ Created system configuration from database:', {
+        departments: config.departments,
+        semesters: config.semesters,
+        sections: config.sections,
+        categories: config.electiveCategories
+      });
+    }
+
+    res.json({
+      success: true,
+      config: {
+        departments: config.departments,
+        semesters: config.semesters,
+        sections: config.sections,
+        electiveCategories: config.electiveCategories
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching system config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch system configuration'
+    });
+  }
+});
+
+// Update system configuration (Admin only)
+app.put('/api/system-config', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { departments, semesters, sections, electiveCategories } = req.body;
+
+    let config = await SystemConfig.findOne();
+    
+    if (!config) {
+      config = new SystemConfig();
+    }
+
+    // Update fields if provided
+    if (departments) config.departments = departments;
+    if (semesters) config.semesters = semesters;
+    if (sections) config.sections = sections;
+    if (electiveCategories) config.electiveCategories = electiveCategories;
+    
+    config.updatedAt = new Date();
+    await config.save();
+
+    console.log('✅ System configuration updated');
+
+    res.json({
+      success: true,
+      message: 'System configuration updated successfully',
+      config: {
+        departments: config.departments,
+        semesters: config.semesters,
+        sections: config.sections,
+        electiveCategories: config.electiveCategories
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error updating system config:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update system configuration'
+    });
+  }
+});
+
+// ==================== SYLLABUS MANAGEMENT ENDPOINTS ====================
+
+// Upload a new syllabus (Admin only)
+app.post('/api/syllabi', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const {
+      electiveId,
+      title,
+      description,
+      pdfData,
+      pdfFileName,
+      uploadedBy,
+      academicYear,
+      semester,
+      version,
+      isActive
+    } = req.body;
+
+    // Validate required fields
+    if (!electiveId || !title || !pdfData || !pdfFileName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: electiveId, title, pdfData, pdfFileName'
+      });
+    }
+
+    // Deactivate previous versions for this elective
+    await Syllabus.updateMany(
+      { electiveId, isActive: true },
+      { $set: { isActive: false } }
+    );
+
+    // Create new syllabus
+    const newSyllabus = new Syllabus({
+      electiveId,
+      title,
+      description,
+      pdfData,
+      pdfFileName,
+      uploadedBy,
+      academicYear,
+      semester,
+      version: version || 1,
+      isActive: isActive !== undefined ? isActive : true
+    });
+
+    await newSyllabus.save();
+
+    console.log(`✅ Syllabus uploaded for elective ${electiveId}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Syllabus uploaded successfully',
+      syllabus: {
+        id: newSyllabus._id.toString(),
+        electiveId: newSyllabus.electiveId,
+        title: newSyllabus.title,
+        description: newSyllabus.description,
+        pdfData: newSyllabus.pdfData,
+        pdfFileName: newSyllabus.pdfFileName,
+        uploadedBy: newSyllabus.uploadedBy,
+        uploadedAt: newSyllabus.uploadedAt,
+        academicYear: newSyllabus.academicYear,
+        semester: newSyllabus.semester,
+        version: newSyllabus.version,
+        isActive: newSyllabus.isActive
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error uploading syllabus:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upload syllabus'
+    });
+  }
+});
+
+// Get all active syllabi (Public - Students need access)
+app.get('/api/syllabi', async (req, res) => {
+  try {
+    const syllabi = await Syllabus.find({ isActive: true })
+      .sort({ uploadedAt: -1 });
+
+    const formattedSyllabi = syllabi.map(syllabus => ({
+      id: syllabus._id.toString(),
+      electiveId: syllabus.electiveId,
+      title: syllabus.title,
+      description: syllabus.description,
+      pdfData: syllabus.pdfData,
+      pdfFileName: syllabus.pdfFileName,
+      uploadedBy: syllabus.uploadedBy,
+      uploadedAt: syllabus.uploadedAt,
+      academicYear: syllabus.academicYear,
+      semester: syllabus.semester,
+      version: syllabus.version,
+      isActive: syllabus.isActive
+    }));
+
+    console.log(`✅ Retrieved ${formattedSyllabi.length} active syllabi`);
+
+    res.json({
+      syllabi: formattedSyllabi
+    });
+  } catch (error) {
+    console.error('❌ Error fetching syllabi:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch syllabi'
+    });
+  }
+});
+
+// Get syllabus for a specific elective (Public - Students need access)
+app.get('/api/syllabi/elective/:electiveId', async (req, res) => {
+  try {
+    const { electiveId } = req.params;
+
+    const syllabus = await Syllabus.findOne({ electiveId, isActive: true });
+
+    if (!syllabus) {
+      return res.status(404).json({
+        success: false,
+        error: 'Syllabus not found for this elective'
+      });
+    }
+
+    console.log(`✅ Retrieved syllabus for elective ${electiveId}`);
+
+    res.json({
+      syllabus: {
+        id: syllabus._id.toString(),
+        electiveId: syllabus.electiveId,
+        title: syllabus.title,
+        description: syllabus.description,
+        pdfData: syllabus.pdfData,
+        pdfFileName: syllabus.pdfFileName,
+        uploadedBy: syllabus.uploadedBy,
+        uploadedAt: syllabus.uploadedAt,
+        academicYear: syllabus.academicYear,
+        semester: syllabus.semester,
+        version: syllabus.version,
+        isActive: syllabus.isActive
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error fetching syllabus:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch syllabus'
+    });
+  }
+});
+
+// Update a syllabus (Admin only)
+app.put('/api/syllabi/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { id } = req.params;
+    const updates = req.body;
+
+    const syllabus = await Syllabus.findByIdAndUpdate(
+      id,
+      updates,
+      { new: true }
+    );
+
+    if (!syllabus) {
+      return res.status(404).json({
+        success: false,
+        error: 'Syllabus not found'
+      });
+    }
+
+    console.log(`✅ Syllabus ${id} updated`);
+
+    res.json({
+      success: true,
+      message: 'Syllabus updated successfully',
+      syllabus: {
+        id: syllabus._id.toString(),
+        electiveId: syllabus.electiveId,
+        title: syllabus.title,
+        description: syllabus.description,
+        pdfData: syllabus.pdfData,
+        pdfFileName: syllabus.pdfFileName,
+        uploadedBy: syllabus.uploadedBy,
+        uploadedAt: syllabus.uploadedAt,
+        academicYear: syllabus.academicYear,
+        semester: syllabus.semester,
+        version: syllabus.version,
+        isActive: syllabus.isActive
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error updating syllabus:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update syllabus'
+    });
+  }
+});
+
+// Delete a syllabus (Admin only)
+app.delete('/api/syllabi/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { id } = req.params;
+
+    const syllabus = await Syllabus.findByIdAndDelete(id);
+
+    if (!syllabus) {
+      return res.status(404).json({
+        success: false,
+        error: 'Syllabus not found'
+      });
+    }
+
+    console.log(`✅ Syllabus ${id} deleted`);
+
+    res.json({
+      success: true,
+      message: 'Syllabus deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error deleting syllabus:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete syllabus'
+    });
+  }
+});
+
+// ==================== EMAIL NOTIFICATION ENDPOINTS ====================
+
+// Send email notification to targeted students (Admin only)
+app.post('/api/notifications/send-email', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { subject, message, recipients, alertType, filters } = req.body;
+
+    // Validate required fields
+    if (!subject || !message || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: subject, message, recipients'
+      });
+    }
+
+    // Check if email is configured
+    if (!emailTransporter) {
+      console.warn('⚠️ Email not configured, simulating email send');
+      return res.json({
+        success: true,
+        sentCount: recipients.length,
+        failedCount: 0,
+        message: `Simulated email send to ${recipients.length} recipients (Email service not configured)`
+      });
+    }
+
+    let sentCount = 0;
+    let failedCount = 0;
+    const failedEmails = [];
+
+    // Send email to each recipient
+    for (const recipient of recipients) {
+      try {
+        await emailTransporter.sendMail({
+          from: process.env.EMAIL_FROM || '"Elective System" <noreply@example.com>',
+          to: recipient.email,
+          subject: subject,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background-color: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                .content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+                .footer { background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280; border-radius: 0 0 8px 8px; }
+                .alert-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 15px; }
+                .alert-general { background-color: #dbeafe; color: #1e40af; }
+                .alert-deadline { background-color: #fee2e2; color: #991b1b; }
+                .alert-reminder { background-color: #fef3c7; color: #92400e; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h2>${subject}</h2>
+                </div>
+                <div class="content">
+                  ${alertType ? `<span class="alert-badge alert-${alertType}">${alertType.replace('_', ' ').toUpperCase()}</span>` : ''}
+                  <p>Dear ${recipient.name},</p>
+                  <p>${message.replace(/\n/g, '<br>')}</p>
+                  ${filters ? `
+                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #e5e7eb;">
+                    <p style="font-size: 14px; color: #6b7280;">
+                      <strong>Targeted to:</strong><br>
+                      ${filters.department ? `Department: ${filters.department}<br>` : ''}
+                      ${filters.semester ? `Semester: ${filters.semester}<br>` : ''}
+                      ${filters.sections && filters.sections.length > 0 ? `Sections: ${filters.sections.join(', ')}` : ''}
+                    </p>
+                  ` : ''}
+                </div>
+                <div class="footer">
+                  <p>This is an automated notification from the Elective Selection System.</p>
+                  <p>&copy; ${new Date().getFullYear()} Elective Management System. All rights reserved.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `
+        });
+        sentCount++;
+        console.log(`✅ Email sent to ${recipient.email}`);
+      } catch (emailError) {
+        failedCount++;
+        failedEmails.push(recipient.email);
+        console.error(`❌ Failed to send email to ${recipient.email}:`, emailError.message);
+      }
+    }
+
+    const responseMessage = `Email sent to ${sentCount} recipient(s).${failedCount > 0 ? ` Failed to send to ${failedCount} recipient(s).` : ''}`;
+    
+    console.log(`📧 Email notification completed: ${sentCount} sent, ${failedCount} failed`);
+
+    res.json({
+      success: true,
+      sentCount,
+      failedCount,
+      message: responseMessage,
+      failedEmails: failedCount > 0 ? failedEmails : undefined
+    });
+  } catch (error) {
+    console.error('❌ Error sending email notification:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send email notification',
+      error: error.message
+    });
+  }
+});
+
+// Send email to specific users by IDs (Admin only)
+app.post('/api/notifications/send-to-users', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { userIds, subject, message } = req.body;
+
+    // Validate required fields
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0 || !subject || !message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userIds, subject, message'
+      });
+    }
+
+    // Get users from database
+    const users = await User.find({ _id: { $in: userIds } }).select('email name');
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No users found with the provided IDs'
+      });
+    }
+
+    const recipients = users.map(user => ({
+      email: user.email,
+      name: user.name
+    }));
+
+    // Check if email is configured
+    if (!emailTransporter) {
+      console.warn('⚠️ Email not configured, simulating email send');
+      return res.json({
+        success: true,
+        sentCount: recipients.length,
+        failedCount: 0,
+        message: `Simulated email send to ${recipients.length} users (Email service not configured)`
+      });
+    }
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    for (const recipient of recipients) {
+      try {
+        await emailTransporter.sendMail({
+          from: process.env.EMAIL_FROM || '"Elective System" <noreply@example.com>',
+          to: recipient.email,
+          subject: subject,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+              <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2563eb;">${subject}</h2>
+                <p>Dear ${recipient.name},</p>
+                <p>${message.replace(/\n/g, '<br>')}</p>
+                <hr style="margin: 20px 0;">
+                <p style="font-size: 12px; color: #6b7280;">
+                  This is an automated notification from the Elective Selection System.
+                </p>
+              </div>
+            </body>
+            </html>
+          `
+        });
+        sentCount++;
+      } catch (emailError) {
+        failedCount++;
+        console.error(`❌ Failed to send email to ${recipient.email}:`, emailError.message);
+      }
+    }
+
+    console.log(`📧 Emails sent to users: ${sentCount} sent, ${failedCount} failed`);
+
+    res.json({
+      success: true,
+      sentCount,
+      failedCount,
+      message: `Email sent to ${sentCount} user(s).${failedCount > 0 ? ` Failed to send to ${failedCount}.` : ''}`
+    });
+  } catch (error) {
+    console.error('❌ Error sending emails to users:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send emails to users',
+      error: error.message
+    });
+  }
+});
+
+// Test email configuration (Admin only)
+app.post('/api/notifications/test-email', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { recipientEmail } = req.body;
+
+    if (!recipientEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'Recipient email is required'
+      });
+    }
+
+    // Check if email is configured
+    if (!emailTransporter) {
+      return res.json({
+        success: false,
+        message: 'Email service is not configured. Please configure SMTP settings in environment variables.'
+      });
+    }
+
+    // Send test email
+    await emailTransporter.sendMail({
+      from: process.env.EMAIL_FROM || '"Elective System" <noreply@example.com>',
+      to: recipientEmail,
+      subject: 'Test Email - Elective System',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+            <h2 style="color: #2563eb;">✅ Email Configuration Test</h2>
+            <p>This is a test email from the Elective Selection System.</p>
+            <p>If you're reading this, your email configuration is working correctly!</p>
+            <hr style="margin: 20px 0;">
+            <p style="font-size: 14px; color: #6b7280;">
+              <strong>Configuration Details:</strong><br>
+              SMTP Host: ${process.env.SMTP_HOST}<br>
+              SMTP Port: ${process.env.SMTP_PORT}<br>
+              From: ${process.env.EMAIL_FROM || 'Not configured'}<br>
+              Sent at: ${new Date().toLocaleString()}
+            </p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    console.log(`✅ Test email sent to ${recipientEmail}`);
+
+    res.json({
+      success: true,
+      message: 'Test email sent successfully! Please check the inbox.'
+    });
+  } catch (error) {
+    console.error('❌ Error sending test email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test email',
+      error: error.message
+    });
+  }
+});
+
+// ============================================
+// ELECTIVE LIMITS ROUTES
+// ============================================
+
+// Get all elective limits
+app.get('/api/elective-limits', authenticateToken, async (req, res) => {
+  try {
+    const limits = await ElectiveLimit.find({ isActive: true }).sort({ department: 1, semester: 1, category: 1 });
+    res.json({ success: true, limits });
+  } catch (error) {
+    console.error('Error fetching elective limits:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch elective limits' });
+  }
+});
+
+// Get specific elective limit
+app.get('/api/elective-limits/:department/:semester/:category', authenticateToken, async (req, res) => {
+  try {
+    const { department, semester, category } = req.params;
+    const limit = await ElectiveLimit.findOne({
+      department,
+      semester: parseInt(semester),
+      category,
+      isActive: true
+    });
+    
+    // If no limit found, return default of 1
+    res.json({ 
+      success: true, 
+      limit: limit ? limit.maxElectives : 1,
+      found: !!limit
+    });
+  } catch (error) {
+    console.error('Error fetching elective limit:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch elective limit' });
+  }
+});
+
+// Create or update elective limit
+app.post('/api/elective-limits', authenticateToken, async (req, res) => {
+  try {
+    const { department, semester, category, maxElectives } = req.body;
+    
+    if (!department || !semester || !category || !maxElectives) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    // Check if limit already exists
+    const existingLimit = await ElectiveLimit.findOne({ department, semester, category });
+    
+    if (existingLimit) {
+      // Update existing
+      existingLimit.maxElectives = maxElectives;
+      existingLimit.updatedAt = new Date();
+      await existingLimit.save();
+      res.json({ success: true, limit: existingLimit, updated: true });
+    } else {
+      // Create new
+      const newLimit = new ElectiveLimit({
+        department,
+        semester,
+        category,
+        maxElectives,
+        isActive: true,
+        createdBy: req.user.id
+      });
+      await newLimit.save();
+      res.json({ success: true, limit: newLimit, created: true });
+    }
+  } catch (error) {
+    console.error('Error saving elective limit:', error);
+    res.status(500).json({ success: false, error: 'Failed to save elective limit' });
+  }
+});
+
+// Update elective limit
+app.put('/api/elective-limits/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { maxElectives } = req.body;
+    
+    const limit = await ElectiveLimit.findByIdAndUpdate(
+      id,
+      { maxElectives, updatedAt: new Date() },
+      { new: true }
+    );
+    
+    if (!limit) {
+      return res.status(404).json({ success: false, error: 'Limit not found' });
+    }
+    
+    res.json({ success: true, limit });
+  } catch (error) {
+    console.error('Error updating elective limit:', error);
+    res.status(500).json({ success: false, error: 'Failed to update elective limit' });
+  }
+});
+
+// Delete elective limit
+app.delete('/api/elective-limits/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ElectiveLimit.findByIdAndDelete(id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting elective limit:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete elective limit' });
   }
 });
 

@@ -75,7 +75,7 @@ const Register: React.FC = () => {
       addNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please enter a valid registration number (minimum 5 characters).'
+        message: 'Please enter a valid class roll number (minimum 5 characters).'
       });
       return false;
     }
@@ -130,7 +130,7 @@ const Register: React.FC = () => {
         addNotification({
           type: 'error',
           title: 'Registration failed',
-          message: 'Email or registration number already exists.'
+          message: 'Email or class roll number already exists.'
         });
       }
     } catch {
@@ -306,7 +306,7 @@ const Register: React.FC = () => {
 
               <div>
                 <label htmlFor="registrationNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Registration Number *
+                  Class Roll No *
                 </label>
                 <div className="mt-1 relative">
                   <Hash className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
@@ -318,7 +318,7 @@ const Register: React.FC = () => {
                     value={formData.registrationNumber}
                     onChange={handleChange}
                     className="pl-10 appearance-none relative block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., 2023CRPFTAIE120"
+                    placeholder="e.g., 120"
                   />
                 </div>
               </div>

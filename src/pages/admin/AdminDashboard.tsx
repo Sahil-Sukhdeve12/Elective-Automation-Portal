@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData, AlertNotification } from '../../contexts/DataContext';
-import { Users, BookOpen, BarChart3, Star, Building2, Trash2, Bell, FileText } from 'lucide-react';
+import { emailApi, type EmailNotificationData } from '../../services/api';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { Users, BookOpen, BarChart3, Building2, Trash2, Bell, FileText } from 'lucide-react';
 import AdminSyllabus from './AdminSyllabus';
 
 // Alert Management Component
@@ -10,35 +12,69 @@ interface AlertManagementProps {
   getActiveAlerts: (department?: string, semester?: number) => AlertNotification[];
   deleteAlert: (alertId: string) => void;
   departments: string[];
+  sections: string[];
 }
 
 const AlertManagement: React.FC<AlertManagementProps> = ({ 
   createAlert, 
   getActiveAlerts, 
   deleteAlert,
-  departments 
+  departments,
+  sections
 }) => {
+  const { addNotification } = useNotifications();
   const [newAlert, setNewAlert] = useState({
     title: '',
     message: '',
     type: 'general' as 'elective_reminder' | 'deadline' | 'general',
     targetDepartment: '',
     targetSemester: '',
+    targetSections: [] as string[],
     createdBy: 'Admin',
     sendEmail: false
   });
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
-  const sendEmailNotification = (alertData: typeof newAlert, targetUsers: Array<{email: string, name: string}>) => {
-    // Mock email sending function
-    console.log('Sending email notification:', {
-      subject: alertData.title,
-      message: alertData.message,
-      recipients: targetUsers.map(user => user.email),
-      count: targetUsers.length
-    });
-    
-    // In a real application, this would make an API call to an email service
-    alert(`Mock Email Sent!\n\nSubject: ${alertData.title}\nMessage: ${alertData.message}\nRecipients: ${targetUsers.length} users\n\n(Check console for details)`);
+  const sendEmailNotification = async (alertData: typeof newAlert, targetUsers: Array<{email: string, name: string}>) => {
+    try {
+      setIsSendingEmail(true);
+      
+      const emailData: EmailNotificationData = {
+        subject: alertData.title,
+        message: alertData.message,
+        recipients: targetUsers,
+        alertType: alertData.type,
+        filters: {
+          department: alertData.targetDepartment || undefined,
+          semester: alertData.targetSemester ? parseInt(alertData.targetSemester) : undefined,
+          sections: alertData.targetSections.length > 0 ? alertData.targetSections : undefined
+        }
+      };
+
+      console.log('Sending email notification via API:', emailData);
+      
+      const result = await emailApi.sendAlertEmail(emailData);
+      
+      if (result.success) {
+        addNotification({
+          type: 'success',
+          title: 'Emails Sent Successfully',
+          message: `Email notification sent to ${result.sentCount} student(s). ${result.failedCount > 0 ? `Failed to send to ${result.failedCount} recipient(s).` : ''}`
+        });
+        console.log('✅ Email sent successfully:', result);
+      } else {
+        throw new Error(result.message || 'Failed to send emails');
+      }
+    } catch (error) {
+      console.error('Error sending email notification:', error);
+      addNotification({
+        type: 'error',
+        title: 'Email Send Failed',
+        message: error instanceof Error ? error.message : 'Failed to send email notifications. Please check your email configuration.'
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,6 +87,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
       type: newAlert.type,
       targetDepartment: newAlert.targetDepartment || undefined,
       targetSemester: newAlert.targetSemester ? parseInt(newAlert.targetSemester) : undefined,
+      targetSections: newAlert.targetSections.length > 0 ? newAlert.targetSections : undefined,
       createdBy: newAlert.createdBy
     });
 
@@ -58,7 +95,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
     if (newAlert.sendEmail) {
       // Get target users based on department and semester filters
       const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      let targetUsers = allUsers.filter((user: {role: string, department?: string, semester?: number, email: string, name: string}) => user.role === 'student');
+      let targetUsers = allUsers.filter((user: {role: string, department?: string, semester?: number, section?: string, email: string, name: string}) => user.role === 'student');
       
       if (newAlert.targetDepartment) {
         targetUsers = targetUsers.filter((user: typeof targetUsers[0]) => user.department === newAlert.targetDepartment);
@@ -66,6 +103,10 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
       
       if (newAlert.targetSemester) {
         targetUsers = targetUsers.filter((user: typeof targetUsers[0]) => user.semester === parseInt(newAlert.targetSemester));
+      }
+
+      if (newAlert.targetSections.length > 0) {
+        targetUsers = targetUsers.filter((user: typeof targetUsers[0]) => newAlert.targetSections.includes(user.section || ''));
       }
       
       sendEmailNotification(newAlert, targetUsers);
@@ -77,6 +118,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
       type: 'general',
       targetDepartment: '',
       targetSemester: '',
+      targetSections: [],
       createdBy: 'Admin',
       sendEmail: false
     });
@@ -137,7 +179,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Department (Optional)
+                Department
               </label>
               <select
                 value={newAlert.targetDepartment}
@@ -153,7 +195,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Semester (Optional)
+                Semester
               </label>
               <select
                 value={newAlert.targetSemester}
@@ -168,6 +210,34 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Section
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {sections.map(section => (
+                <label key={section} className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={newAlert.targetSections.includes(section)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setNewAlert({ ...newAlert, targetSections: [...newAlert.targetSections, section] });
+                      } else {
+                        setNewAlert({ ...newAlert, targetSections: newAlert.targetSections.filter(s => s !== section) });
+                      }
+                    }}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">{section}</span>
+                </label>
+              ))}
+              {sections.length === 0 && (
+                <p className="text-sm text-gray-500">No sections available</p>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center space-x-2">
             <input
               type="checkbox"
@@ -175,6 +245,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
               checked={newAlert.sendEmail}
               onChange={(e) => setNewAlert({ ...newAlert, sendEmail: e.target.checked })}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              disabled={isSendingEmail}
             />
             <label htmlFor="sendEmail" className="text-sm text-gray-700">
               Send email notification to targeted students
@@ -183,9 +254,20 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
 
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isSendingEmail}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Create Alert
+            {isSendingEmail ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Sending...
+              </>
+            ) : (
+              'Create Alert'
+            )}
           </button>
         </form>
       </div>
@@ -213,6 +295,7 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
                   <div className="text-sm text-gray-500">
                     {alert.targetDepartment && <span>Department: {alert.targetDepartment} • </span>}
                     {alert.targetSemester && <span>Semester: {alert.targetSemester} • </span>}
+                    {alert.targetSections && alert.targetSections.length > 0 && <span>Sections: {alert.targetSections.join(', ')} • </span>}
                     Created: {alert.createdAt.toLocaleDateString()} • By: {alert.createdBy}
                   </div>
                 </div>
@@ -235,10 +318,9 @@ const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const { 
     electives, 
-    tracks, 
-    studentElectives, 
-    students, // Add students from DataContext
+    students,
     getAvailableDepartments,
+    getAvailableSections,
     createAlert,
     getActiveAlerts,
     deleteAlert
@@ -247,8 +329,9 @@ const AdminDashboard: React.FC = () => {
 
   if (!user || user.role !== 'admin') return null;
 
-  // Get admin-configured departments only
+  // Get admin-configured departments and sections
   const departments = getAvailableDepartments();
+  const sections = getAvailableSections();
 
   // Calculate analytics - use students from DataContext instead of localStorage
   const totalStudents = students.length;
@@ -258,63 +341,10 @@ const AdminDashboard: React.FC = () => {
   // Department-wise statistics
   const departmentStats = departments.map(dept => {
     const deptElectives = electives.filter(e => e.department === dept);
-    const deptTracks = tracks.filter(t => t.department === dept);
-    
-    // Get electives with their selection counts
-    const electivesWithSelections = deptElectives.map(elective => {
-      const selections = studentElectives.filter(se => se.electiveId === elective.id).length;
-      return { ...elective, selections };
-    }).sort((a, b) => b.selections - a.selections);
-
-    // Get tracks with their selection counts
-    const tracksWithSelections = deptTracks.map(track => {
-      const selections = studentElectives.filter(se => se.track === track.name).length;
-      return { ...track, selections };
-    }).sort((a, b) => b.selections - a.selections);
 
     return {
       department: dept,
-      totalElectives: deptElectives.length,
-      totalTracks: deptTracks.length,
-      mostPopularElective: electivesWithSelections[0] || null,
-      mostPopularTrack: tracksWithSelections[0] || null,
-      allElectives: electivesWithSelections,
-      allTracks: tracksWithSelections
-    };
-  });
-
-  // Categorize electives by category
-  const electiveCategories = ['Humanities', 'Departmental', 'Open'] as const;
-  
-  // Track popularity by category
-  const categoryTrackStats = electiveCategories.map(category => {
-    const categoryTracks = tracks.filter(track => track.category === category);
-    
-    const tracksWithSelections = categoryTracks.map(track => {
-      const selections = studentElectives.filter(se => se.track === track.name).length;
-      return { ...track, selections };
-    }).sort((a, b) => b.selections - a.selections);
-
-    return {
-      category,
-      totalTracks: categoryTracks.length,
-      tracks: tracksWithSelections.slice(0, 5) // Top 5 tracks
-    };
-  });
-
-  // Category-wise elective statistics  
-  const categoryElectiveStats = electiveCategories.map(category => {
-    const categoryElectives = electives.filter(elective => elective.category === category);
-    
-    const electivesWithSelections = categoryElectives.map(elective => {
-      const selections = studentElectives.filter(se => se.electiveId === elective.id).length;
-      return { ...elective, selections };
-    }).sort((a, b) => b.selections - a.selections);
-
-    return {
-      category,
-      totalElectives: categoryElectives.length,
-      electives: electivesWithSelections.slice(0, 5) // Top 5 electives
+      totalElectives: deptElectives.length
     };
   });
 
@@ -389,68 +419,6 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/* Track Popularity by Category */}
-            {categoryTrackStats.map((categoryData) => (
-              <div key={categoryData.category} className="bg-white p-6 rounded-lg shadow-sm border">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                  {categoryData.category} Track Popularity
-                </h2>
-                <div className="space-y-4">
-                  {categoryData.tracks.length === 0 ? (
-                    <p className="text-gray-500">No tracks available</p>
-                  ) : (
-                    categoryData.tracks.map((track, index) => (
-                      <div key={track.id} className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-500 w-6">#{index + 1}</span>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">{track.name}</p>
-                            <p className="text-xs text-gray-500">{track.department}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <Star className="w-4 h-4 text-yellow-400 mr-1" />
-                          <span className="text-sm font-medium text-gray-900">{track.selections}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Elective Popularity by Category */}
-            {categoryElectiveStats.map((categoryData) => (
-              <div key={categoryData.category} className="bg-white p-6 rounded-lg shadow-sm border">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                  {categoryData.category} Elective Popularity
-                </h2>
-                <div className="space-y-4">
-                  {categoryData.electives.length === 0 ? (
-                    <p className="text-gray-500">No electives available</p>
-                  ) : (
-                    categoryData.electives.map((elective, index) => (
-                      <div key={elective.id} className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <span className="text-sm text-gray-500 w-6">#{index + 1}</span>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">{elective.name}</p>
-                            <p className="text-xs text-gray-500">{elective.department}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <Star className="w-4 h-4 text-yellow-400 mr-1" />
-                          <span className="text-sm font-medium text-gray-900">{elective.selections}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
         </>
       )}
 
@@ -467,30 +435,6 @@ const AdminDashboard: React.FC = () => {
                     <span className="text-gray-600">Electives Offered</span>
                     <span className="font-bold text-gray-900">{dept.totalElectives}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Tracks Available</span>
-                    <span className="font-bold text-gray-900">{dept.totalTracks}</span>
-                  </div>
-                  
-                  {dept.mostPopularElective && (
-                    <div className="mt-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Most Popular Elective</h4>
-                      <div className="bg-gray-50 p-3 rounded">
-                        <p className="text-sm font-medium">{dept.mostPopularElective.name}</p>
-                        <p className="text-xs text-gray-500">{dept.mostPopularElective.selections} selections</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {dept.mostPopularTrack && (
-                    <div className="mt-4">
-                      <h4 className="font-medium text-gray-900 mb-2">Most Popular Track</h4>
-                      <div className="bg-gray-50 p-3 rounded">
-                        <p className="text-sm font-medium">{dept.mostPopularTrack.name}</p>
-                        <p className="text-xs text-gray-500">{dept.mostPopularTrack.selections} selections</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
@@ -506,6 +450,7 @@ const AdminDashboard: React.FC = () => {
             getActiveAlerts={getActiveAlerts}
             deleteAlert={deleteAlert}
             departments={departments}
+            sections={sections}
           />
         </div>
       )}

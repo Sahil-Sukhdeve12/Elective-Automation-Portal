@@ -165,6 +165,14 @@ export const authApi = {
     return result;
   },
 
+  async me(): Promise<{ user: User }> {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: getAuthHeaders(),
+    });
+    
+    return handleResponse<{ user: User }>(response);
+  },
+
   async getProfile(): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       headers: getAuthHeaders(),
@@ -277,5 +285,180 @@ export const electivesApi = {
   }
 };
 
+// System Config API
+export interface SystemConfig {
+  departments: string[];
+  semesters: number[];
+  sections: string[];
+  electiveCategories: string[];
+}
+
+export const systemConfigApi = {
+  async getConfig(): Promise<SystemConfig> {
+    const response = await fetch(`${API_BASE_URL}/system-config`, {
+      headers: getAuthHeaders(),
+    });
+    
+    const result = await handleResponse<{ success: boolean; config: SystemConfig }>(response);
+    return result.config;
+  },
+
+  async updateConfig(config: Partial<SystemConfig>): Promise<SystemConfig> {
+    const response = await fetch(`${API_BASE_URL}/system-config`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(config),
+    });
+    
+    const result = await handleResponse<{ success: boolean; config: SystemConfig }>(response);
+    return result.config;
+  }
+};
+
+// Syllabus API
+export interface SyllabusData {
+  id: string;
+  electiveId: string;
+  title: string;
+  description: string;
+  pdfData: string; // Base64 encoded PDF
+  pdfFileName: string;
+  uploadedBy: string;
+  uploadedAt: string | Date;
+  academicYear: string;
+  semester: number;
+  version: number;
+  isActive: boolean;
+}
+
+export const syllabusApi = {
+  // Upload a new syllabus
+  async uploadSyllabus(syllabusData: Omit<SyllabusData, 'id' | 'uploadedAt'>): Promise<SyllabusData> {
+    const response = await fetch(`${API_BASE_URL}/syllabi`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(syllabusData),
+    });
+    
+    const result = await handleResponse<{ success: boolean; syllabus: SyllabusData }>(response);
+    return result.syllabus;
+  },
+
+  // Get all active syllabi (Public - No auth required)
+  async getAllSyllabi(): Promise<SyllabusData[]> {
+    const response = await fetch(`${API_BASE_URL}/syllabi`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    const result = await handleResponse<{ syllabi: SyllabusData[] }>(response);
+    return result.syllabi;
+  },
+
+  // Get syllabus for a specific elective (Public - No auth required)
+  async getSyllabusByElective(electiveId: string): Promise<SyllabusData | null> {
+    const response = await fetch(`${API_BASE_URL}/syllabi/elective/${electiveId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (response.status === 404) {
+      return null;
+    }
+    
+    const result = await handleResponse<{ syllabus: SyllabusData }>(response);
+    return result.syllabus;
+  },
+
+  // Update a syllabus
+  async updateSyllabus(syllabusId: string, updates: Partial<SyllabusData>): Promise<SyllabusData> {
+    const response = await fetch(`${API_BASE_URL}/syllabi/${syllabusId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates),
+    });
+    
+    const result = await handleResponse<{ success: boolean; syllabus: SyllabusData }>(response);
+    return result.syllabus;
+  },
+
+  // Delete a syllabus
+  async deleteSyllabus(syllabusId: string): Promise<boolean> {
+    const response = await fetch(`${API_BASE_URL}/syllabi/${syllabusId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    
+    const result = await handleResponse<{ success: boolean }>(response);
+    return result.success;
+  }
+};
+
+// Email API
+export interface EmailNotificationData {
+  subject: string;
+  message: string;
+  recipients: Array<{
+    email: string;
+    name: string;
+  }>;
+  alertType?: 'general' | 'elective_reminder' | 'deadline';
+  filters?: {
+    department?: string;
+    semester?: number;
+    sections?: string[];
+  };
+}
+
+export interface EmailResponse {
+  success: boolean;
+  sentCount: number;
+  failedCount: number;
+  message: string;
+}
+
+export const emailApi = {
+  // Send email notification to targeted students
+  async sendAlertEmail(emailData: EmailNotificationData): Promise<EmailResponse> {
+    const response = await fetch(`${API_BASE_URL}/notifications/send-email`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(emailData),
+    });
+    
+    const result = await handleResponse<EmailResponse>(response);
+    return result;
+  },
+
+  // Send email to specific users by IDs
+  async sendEmailToUsers(userIds: string[], subject: string, message: string): Promise<EmailResponse> {
+    const response = await fetch(`${API_BASE_URL}/notifications/send-to-users`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ userIds, subject, message }),
+    });
+    
+    const result = await handleResponse<EmailResponse>(response);
+    return result;
+  },
+
+  // Test email configuration (send test email to admin)
+  async sendTestEmail(recipientEmail: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${API_BASE_URL}/notifications/test-email`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ recipientEmail }),
+    });
+    
+    const result = await handleResponse<{ success: boolean; message: string }>(response);
+    return result;
+  }
+};
+
 // Export the ApiError for error handling
 export { ApiError };
+

@@ -1,22 +1,11 @@
 import React, { useMemo } from 'react';
 import { useData, Student } from '../../contexts/DataContext';
-import { BarChart3, TrendingUp, Users, BookOpen, Award, Target, Download } from 'lucide-react';
+import { BarChart3, Users, BookOpen, Award, Target, Download } from 'lucide-react';
 
 const AdminAnalytics: React.FC = () => {
-  const { electives, tracks, studentElectives, students } = useData();
+  const { electives, studentElectives, students } = useData();
 
   const analytics = useMemo(() => {
-    // track analytics
-    const trackstats = tracks.map(track => {
-      const trackselections = studentElectives.filter(se => se.track === track.name);
-      const uniqueStudents = new Set(trackselections.map(se => se.studentId)).size;
-      return {
-        ...track,
-        selections: trackselections.length,
-        students: uniqueStudents
-      };
-    });
-
     // Semester analytics
     const semesterStats = [5, 6, 7, 8].map(semester => {
       const semesterSelections = studentElectives.filter(se => se.semester === semester);
@@ -42,28 +31,23 @@ const AdminAnalytics: React.FC = () => {
     // Student engagement
     const studentEngagement = students.map((student: Student) => {
       const studentElectivesData = studentElectives.filter(se => se.studentId === student.id);
-      const trackspread = new Set(studentElectivesData.map(se => se.track)).size;
       return {
         ...student,
-        totalElectives: studentElectivesData.length,
-        trackspread
+        totalElectives: studentElectivesData.length
       };
     });
 
     const avgElectivesPerStudent = studentEngagement.reduce((sum, s) => sum + s.totalElectives, 0) / students.length;
-    const avgtrackspread = studentEngagement.reduce((sum, s) => sum + s.trackspread, 0) / students.length;
 
     return {
-      trackstats,
       semesterStats,
       electivePopularity,
       studentEngagement,
       avgElectivesPerStudent: avgElectivesPerStudent || 0,
-      avgtrackspread: avgtrackspread || 0,
       totalSelections: studentElectives.length,
       activeStudents: new Set(studentElectives.map(se => se.studentId)).size
     };
-  }, [electives, tracks, studentElectives, students]);
+  }, [electives, studentElectives, students]);
 
   const handleExportAnalytics = () => {
     const reportData = {
@@ -74,7 +58,6 @@ const AdminAnalytics: React.FC = () => {
         totalSelections: analytics.totalSelections,
         activeStudents: analytics.activeStudents
       },
-      trackstats: analytics.trackstats,
       semesterStats: analytics.semesterStats,
       popularElectives: analytics.electivePopularity.slice(0, 10)
     };
@@ -142,50 +125,9 @@ const AdminAnalytics: React.FC = () => {
             </div>
           </div>
         </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex items-center">
-            <Award className="w-8 h-8 text-orange-600" />
-            <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{analytics.avgtrackspread.toFixed(1)}</p>
-              <p className="text-gray-600">Avg track Spread</p>
-              <p className="text-xs text-gray-500">diversification</p>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* track Distribution */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">track Distribution</h2>
-          <div className="space-y-4">
-            {analytics.trackstats.map(track => {
-              const maxSelections = Math.max(...analytics.trackstats.map(d => d.selections));
-              const percentage = maxSelections > 0 ? (track.selections / maxSelections) * 100 : 0;
-              
-              return (
-                <div key={track.id} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900">{track.name}</span>
-                    <span className="text-sm text-gray-600">{track.selections} selections</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${track.color}`}
-                      style={{ width: `${Math.max(5, percentage)}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>{track.students} students</span>
-                    <span>{((track.selections / analytics.totalSelections) * 100).toFixed(1)}%</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
         {/* Semester Utilization */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">Semester Utilization</h2>
@@ -255,18 +197,6 @@ const AdminAnalytics: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-medium text-green-900">Average track Spread</h3>
-                  <p className="text-sm text-green-700">Cross-track exploration</p>
-                </div>
-                <div className="text-2xl font-bold text-green-900">
-                  {analytics.avgtrackspread.toFixed(1)}
-                </div>
-              </div>
-            </div>
-
             <div className="space-y-2">
               <h4 className="font-medium text-gray-900">Engagement Distribution</h4>
               {[
@@ -295,50 +225,10 @@ const AdminAnalytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Detailed Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        {analytics.trackstats.map(track => (
-          <div key={track.id} className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">{track.name}</h3>
-              <div className={`w-4 h-4 rounded-full ${track.color}`}></div>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Selections:</span>
-                <span className="font-medium text-gray-900">{track.selections}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Unique Students:</span>
-                <span className="font-medium text-gray-900">{track.students}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Market Share:</span>
-                <span className="font-medium text-gray-900">
-                  {((track.selections / analytics.totalSelections) * 100).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            
-            <p className="text-sm text-gray-600 mt-4">{track.description}</p>
-          </div>
-        ))}
-      </div>
-
       {/* Insights */}
       <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border">
         <h2 className="text-xl font-semibold text-gray-900 mb-6">Key Insights</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <TrendingUp className="w-8 h-8 text-blue-600 mb-3" />
-            <h3 className="font-medium text-blue-900 mb-2">Most Popular track</h3>
-            <p className="text-sm text-blue-800">
-              {analytics.trackstats[0]?.name} leads with {analytics.trackstats[0]?.selections} selections
-              from {analytics.trackstats[0]?.students} students.
-            </p>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
             <Award className="w-8 h-8 text-green-600 mb-3" />
             <h3 className="font-medium text-green-900 mb-2">Best Performing Elective</h3>

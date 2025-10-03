@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, FileText, Eye, Trash2 } from 'lucide-react';
+import { Plus, FileText, Eye, Trash2, CheckCircle } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 
 const AdminFeedback: React.FC = () => {
@@ -7,17 +7,28 @@ const AdminFeedback: React.FC = () => {
     getActiveFeedbackTemplates,
     deleteFeedbackTemplate, 
     createFeedbackTemplate,
-    getFeedbackResponses
+    getFeedbackResponses,
+    getAvailableDepartments,
+    getAvailableSemesters,
+    getAvailableSections
   } = useData();
   
   // Get all templates and responses
   const feedbackTemplates = getActiveFeedbackTemplates();
   const feedbackResponses = getFeedbackResponses();
   
+  // Get dynamic values from database
+  const availableDepartments = getAvailableDepartments();
+  const availableSemesters = getAvailableSemesters();
+  const availableSections = getAvailableSections();
+  
   const [newTemplate, setNewTemplate] = useState({
     title: '',
     description: '',
     targetCategory: 'Departmental' as 'Departmental' | 'Open' | 'Humanities',
+    targetDepartment: '',
+    targetSemester: undefined as number | undefined,
+    targetSection: [] as string[],
     isActive: true,
     createdBy: 'admin',
     questions: [{ 
@@ -77,6 +88,9 @@ const AdminFeedback: React.FC = () => {
         title: '',
         description: '',
         targetCategory: 'Departmental',
+        targetDepartment: '',
+        targetSemester: undefined,
+        targetSection: [],
         isActive: true,
         createdBy: 'admin',
         questions: [{ id: '', question: '', type: 'text', options: [], required: true }]
@@ -193,6 +207,99 @@ const AdminFeedback: React.FC = () => {
               </select>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Target Department (Optional)
+                </label>
+                <select
+                  value={newTemplate.targetDepartment}
+                  onChange={(e) => setNewTemplate(prev => ({ ...prev, targetDepartment: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                           focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Departments</option>
+                  {availableDepartments.map(dept => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Leave blank to show to all departments
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Target Semester (Optional)
+                </label>
+                <select
+                  value={newTemplate.targetSemester || ''}
+                  onChange={(e) => setNewTemplate(prev => ({ ...prev, targetSemester: e.target.value ? parseInt(e.target.value) : undefined }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                           focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Semesters</option>
+                  {availableSemesters.map(sem => (
+                    <option key={sem} value={sem}>
+                      Semester {sem}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Leave blank to show to all semesters
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Target Section (Optional)
+                </label>
+                <div className="space-y-2">
+                  {availableSections.length > 0 ? (
+                    availableSections.map(section => (
+                      <label key={section} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newTemplate.targetSection.includes(section)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewTemplate(prev => ({
+                                ...prev,
+                                targetSection: [...prev.targetSection, section]
+                              }));
+                            } else {
+                              setNewTemplate(prev => ({
+                                ...prev,
+                                targetSection: prev.targetSection.filter(s => s !== section)
+                              }));
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center">
+                          Section {section}
+                          {newTemplate.targetSection.includes(section) && (
+                            <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
+                          )}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                      No sections found in database. Add students with sections first.
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Select specific sections or leave all unchecked to show to all sections
+                </p>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Questions
@@ -306,6 +413,36 @@ const AdminFeedback: React.FC = () => {
                       {template.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
+                  {(template.targetDepartment || template.targetSemester || (template.targetSection && (Array.isArray(template.targetSection) ? template.targetSection.length > 0 : true))) && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Target:</span>
+                      {template.targetDepartment && (
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded">
+                          {template.targetDepartment}
+                        </span>
+                      )}
+                      {template.targetSemester && (
+                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs rounded">
+                          Semester {template.targetSemester}
+                        </span>
+                      )}
+                      {template.targetSection && (
+                        <>
+                          {Array.isArray(template.targetSection) ? (
+                            template.targetSection.map(section => (
+                              <span key={section} className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs rounded">
+                                Section {section}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs rounded">
+                              Section {template.targetSection}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button
                   onClick={() => handleDelete(template.id)}

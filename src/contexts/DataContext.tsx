@@ -22,6 +22,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { systemConfigApi, syllabusApi, type SyllabusData } from '../services/api';
 
 // API Base URL helper
 const getApiBaseUrl = () => {
@@ -92,6 +93,121 @@ const fetchUsers = async () => {
   }
 };
 
+const fetchTracks = async () => {
+  try {
+    console.log('Fetching tracks from API...');
+    const response = await fetch(`${getApiBaseUrl()}/tracks`);
+    console.log('Fetch tracks response status:', response.status);
+    
+    if (!response.ok) {
+      console.error('Fetch tracks failed with status:', response.status);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log('Raw tracks from API:', data);
+    
+    const tracks = Array.isArray(data) ? data : (data.tracks || []);
+    
+    // Map MongoDB _id to id for frontend compatibility
+    const mappedTracks = tracks.map((track: any) => ({
+      ...track,
+      id: track._id || track.id
+    }));
+    
+    console.log('Mapped tracks:', mappedTracks);
+    return mappedTracks;
+  } catch (error) {
+    console.error('Error fetching tracks:', error);
+    return [];
+  }
+};
+
+const fetchSyllabi = async () => {
+  try {
+    console.log('Fetching syllabi from MongoDB API...');
+    const syllabi = await syllabusApi.getAllSyllabi();
+    console.log('✅ Syllabi fetched successfully from MongoDB:', syllabi.length);
+    
+    // Convert uploadedAt strings to Date objects
+    const mappedSyllabi = syllabi.map((syllabus: SyllabusData) => ({
+      ...syllabus,
+      uploadedAt: new Date(syllabus.uploadedAt)
+    }));
+    
+    return mappedSyllabi;
+  } catch (error) {
+    // console.error('Error fetching syllabi from MongoDB:', error);
+    // Fallback to localStorage if API fails
+    const storedSyllabi = localStorage.getItem('syllabi');
+    if (storedSyllabi) {
+      const parsedSyllabi = JSON.parse(storedSyllabi).map((syllabus: any) => ({
+        ...syllabus,
+        uploadedAt: new Date(syllabus.uploadedAt)
+      }));
+      console.log('Using syllabi from localStorage fallback:', parsedSyllabi.length);
+      return parsedSyllabi;
+    }
+    return [];
+  }
+};
+
+// API function to fetch student elective selections
+const fetchStudentSelections = async () => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      console.log('No auth token found, skipping selection fetch');
+      return [];
+    }
+
+    const response = await fetch(`${getApiBaseUrl()}/student/selections`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch student selections:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('Raw student selections from API:', data);
+    
+    if (data.success && data.selections) {
+      // Map backend selections to frontend format
+      return data.selections.map((selection: any) => {
+        // electiveId is populated, so it's an object with _id, name, track, etc.
+        const electiveId = typeof selection.electiveId === 'object' 
+          ? (selection.electiveId._id || selection.electiveId.id)
+          : selection.electiveId;
+        
+        const track = typeof selection.electiveId === 'object'
+          ? (selection.electiveId.track || '')
+          : '';
+        
+        return {
+          id: selection._id || selection.id,
+          studentId: selection.studentId,
+          electiveId: electiveId,
+          semester: selection.semester,
+          track: track,
+          category: selection.category || [],
+          status: selection.status || 'selected',
+          dateSelected: selection.selectedAt || selection.createdAt || new Date().toISOString()
+        };
+      });
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error fetching student selections:', error);
+    return [];
+  }
+};
+
 export interface Student {
   id: string;
   name: string;
@@ -116,7 +232,7 @@ export interface Elective {
   code?: string; // Make code optional
   credits: number;
   description: string;
-  category: 'Departmental' | 'Open' | 'Humanities';
+  category: ('Departmental' | 'Open' | 'Humanities')[]; // Now an array of categories
   electiveCategory: 'Core' | 'Elective' | 'Lab';
   subjectType?: 'Theory' | 'Practical' | 'Theory+Practical'; // Type of subject
   department: string;
@@ -128,10 +244,13 @@ export interface Elective {
   image?: string; // Optional image URL for the elective
   infoImage?: string; // Alternative field name for image (for backward compatibility)
   selectionDeadline?: string; // ISO date string for selection deadline
+  deadline?: Date | string; // Also support Date type or string
   prerequisites?: string[];
   futureOpportunities?: string[];
   minEnrollment?: number;
   maxEnrollment?: number;
+  maxStudents?: number; // Legacy field - keeping for backward compatibility
+  enrolledStudents?: number; // Current number of enrolled students
 }
 
 export interface AlertNotification {
@@ -141,6 +260,7 @@ export interface AlertNotification {
   type: 'elective_reminder' | 'deadline' | 'general';
   targetSemester?: number;
   targetDepartment?: string;
+  targetSections?: string[]; // Added sections field
   createdAt: Date;
   createdBy: string;
 }
@@ -151,6 +271,9 @@ export interface FeedbackTemplate {
   description: string;
   questions: FeedbackQuestion[];
   targetCategory?: 'Departmental' | 'Open' | 'Humanities';
+  targetDepartment?: string;
+  targetSemester?: number;
+  targetSection?: string | string[]; // Can be a single section or array of sections
   isActive: boolean;
   createdBy: string;
   createdAt: Date;
@@ -172,6 +295,7 @@ export interface FeedbackResponse {
   studentName: string;
   studentDepartment?: string;
   studentSemester?: number;
+  studentSection?: string;
   responses: {
     questionId: string;
     question: string;
@@ -185,14 +309,11 @@ export interface FeedbackResponse {
 export interface Track {
   id: string;
   name: string;
-  description: string;
   color: string;
-  suggestedElectives: string[];
+  
   department: string;
-  prerequisites: string[];
-  careerOutcomes: string[];
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
-  estimatedHours: number;
+  
+  
   category: string;
 }
 
@@ -234,7 +355,7 @@ export interface Syllabus {
   electiveId: string;
   title: string;
   description: string;
-  pdfUrl: string;
+  pdfData: string; // Base64 encoded PDF data
   pdfFileName: string;
   uploadedBy: string;
   uploadedAt: Date;
@@ -278,19 +399,19 @@ interface DataContextType {
   getElectiveEnrollmentCount: (electiveId: string) => number;
   isElectiveAvailable: (electiveId: string) => { available: boolean; reason?: string };
   isElectiveSelectionOpen: (electiveId: string) => boolean;
-  addDepartment: (department: string) => boolean;
-  removeDepartment: (department: string) => boolean;
-  addSection: (section: string) => boolean;
-  removeSection: (section: string) => boolean;
-  addSemester: (semester: number) => boolean;
-  removeSemester: (semester: number) => boolean;
+  addDepartment: (department: string) => Promise<boolean>;
+  removeDepartment: (department: string) => Promise<boolean>;
+  addSection: (section: string) => Promise<boolean>;
+  removeSection: (section: string) => Promise<boolean>;
+  addSemester: (semester: number) => Promise<boolean>;
+  removeSemester: (semester: number) => Promise<boolean>;
   // Track management functions
-  addTrack: (track: Omit<Track, 'id'>) => boolean;
-  updateTrack: (id: string, updates: Partial<Track>) => boolean;
-  removeTrack: (id: string) => boolean;
+  addTrack: (track: Omit<Track, 'id'>) => Promise<boolean>;
+  updateTrack: (id: string, updates: Partial<Track>) => Promise<boolean>;
+  removeTrack: (id: string) => Promise<boolean>;
   getAvailableCategories: () => string[];
-  addCategory: (category: string) => boolean;
-  removeCategory: (category: string) => boolean;
+  addCategory: (category: string) => Promise<boolean>;
+  removeCategory: (category: string) => Promise<boolean>;
   // Alert system functions
   createAlert: (alert: Omit<AlertNotification, 'id' | 'createdAt'>) => void;
   getActiveAlerts: (department?: string, semester?: number) => AlertNotification[];
@@ -314,6 +435,8 @@ interface DataContextType {
   setElectiveDeadline: (electiveId: string, deadline: string) => void;
   getElectiveDeadline: (electiveId: string) => string | null;
   addElectiveFeedback: (feedback: Omit<ElectiveFeedbackForm, 'id'>) => void;
+  // Elective limit functions
+  getElectiveLimit: (department: string, semester: number, category: string) => Promise<number>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -822,7 +945,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [studentElectives, setStudentElectives] = useState<StudentElective[]>([]);
   const [electiveFeedbacks, setElectiveFeedbacks] = useState<ElectiveFeedbackForm[]>([]);
   
-  // Admin-configured data
+  // Admin-configured data - will be loaded from database
   const [adminDepartments, setAdminDepartments] = useState<string[]>([]);
   const [adminSections, setAdminSections] = useState<string[]>([]);
   const [adminSemesters, setAdminSemesters] = useState<number[]>([]);
@@ -840,6 +963,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadData = async () => {
       console.log('🔄 Loading data from backend...');
       
+      // Fetch system config from database
+      try {
+        const systemConfig = await systemConfigApi.getConfig();
+        console.log('✅ Loaded system config from database:', systemConfig);
+        
+        if (systemConfig.departments && systemConfig.departments.length > 0) {
+          setAdminDepartments(systemConfig.departments);
+        }
+        if (systemConfig.sections && systemConfig.sections.length > 0) {
+          setAdminSections(systemConfig.sections);
+        }
+        if (systemConfig.semesters && systemConfig.semesters.length > 0) {
+          setAdminSemesters(systemConfig.semesters);
+        }
+        if (systemConfig.electiveCategories && systemConfig.electiveCategories.length > 0) {
+          setAdminCategories(systemConfig.electiveCategories);
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not load system config from database, using defaults:', error);
+        // Keep the default values already set in state
+      }
+      
       // Fetch electives from backend
       const backendElectives = await fetchElectives();
       if (backendElectives.length > 0) {
@@ -854,6 +999,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setElectives(initialElectives);
           localStorage.setItem('electives', JSON.stringify(initialElectives));
+        }
+      }
+
+      // Fetch tracks from backend
+      const backendTracks = await fetchTracks();
+      if (backendTracks.length > 0) {
+        console.log('✅ Loaded tracks from backend:', backendTracks.length);
+        setTracks(backendTracks);
+        localStorage.setItem('tracks', JSON.stringify(backendTracks));
+      } else {
+        // Fallback to stored data
+        const storedTracks = localStorage.getItem('tracks');
+        if (storedTracks) {
+          setTracks(JSON.parse(storedTracks));
+        } else {
+          setTracks(initialTracks);
+          localStorage.setItem('tracks', JSON.stringify(initialTracks));
         }
       }
 
@@ -891,12 +1053,36 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setStudents(JSON.parse(storedStudents));
         }
       }
+
+      // Fetch syllabi from MongoDB
+      const backendSyllabi = await fetchSyllabi();
+      if (backendSyllabi.length > 0) {
+        console.log('✅ Loaded syllabi from MongoDB:', backendSyllabi.length);
+        setSyllabi(backendSyllabi);
+        localStorage.setItem('syllabi', JSON.stringify(backendSyllabi));
+      } else {
+        // Fallback to localStorage if API fails
+        const storedSyllabi = localStorage.getItem('syllabi');
+        if (storedSyllabi) {
+          const parsedSyllabi = JSON.parse(storedSyllabi).map((syllabus: any) => ({
+            ...syllabus,
+            uploadedAt: new Date(syllabus.uploadedAt)
+          }));
+          setSyllabi(parsedSyllabi);
+        }
+      }
+
+      // Fetch student selections from backend (for logged-in students)
+      const backendSelections = await fetchStudentSelections();
+      if (backendSelections.length > 0) {
+        console.log('✅ Loaded student selections from backend:', backendSelections.length);
+        setStudentElectives(backendSelections);
+      }
     };
 
     loadData();
 
     // Initialize other data from localStorage or use defaults
-    const storedStudentElectives = localStorage.getItem('studentElectives');
     const storedElectiveFeedbacks = localStorage.getItem('electiveFeedbacks');
     
     // Initialize admin-configured data
@@ -911,21 +1097,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storedFeedbackTemplates = localStorage.getItem('feedbackTemplates');
     const storedFeedbackResponses = localStorage.getItem('feedbackResponses');
     const storedSyllabi = localStorage.getItem('syllabi');
-
-    if (storedStudentElectives) {
-      setStudentElectives(JSON.parse(storedStudentElectives));
-    }
     
     if (storedAdminDepartments) {
-      setAdminDepartments(JSON.parse(storedAdminDepartments));
+      const parsed = JSON.parse(storedAdminDepartments);
+      if (parsed.length > 0) {
+        setAdminDepartments(parsed);
+      }
     }
     
     if (storedAdminSections) {
-      setAdminSections(JSON.parse(storedAdminSections));
+      const parsed = JSON.parse(storedAdminSections);
+      if (parsed.length > 0) {
+        setAdminSections(parsed);
+      }
     }
     
     if (storedAdminSemesters) {
-      setAdminSemesters(JSON.parse(storedAdminSemesters));
+      const parsed = JSON.parse(storedAdminSemesters);
+      if (parsed.length > 0) {
+        setAdminSemesters(parsed);
+      }
     }
 
     if (storedTracks) {
@@ -1074,7 +1265,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Remove from student electives
       const updatedStudentElectives = studentElectives.filter(se => se.id !== studentElectiveId);
       setStudentElectives(updatedStudentElectives);
-      localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
       return true;
     } catch (error) {
       console.error('Error removing elective:', error);
@@ -1100,7 +1290,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : se
       );
       setStudentElectives(updatedStudentElectives);
-      localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
       return true;
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -1141,22 +1330,61 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const selectElective = async (studentId: string, electiveId: string, semester: number): Promise<boolean> => {
-    const elective = electives.find(e => e.id === electiveId);
-    if (!elective) return false;
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('No auth token found');
+        return false;
+      }
 
-    const studentElective: StudentElective = {
-      id: `se_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      studentId,
-      electiveId,
-      semester,
-      dateSelected: new Date().toISOString(),
-      track: elective.track
-    };
+      const response = await fetch(`${getApiBaseUrl()}/electives/select/${electiveId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          studentId,
+          semester
+        })
+      });
 
-    const updatedStudentElectives = [...studentElectives, studentElective];
-    setStudentElectives(updatedStudentElectives);
-    localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
-    return true;
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Failed to select elective:', error);
+        return false;
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state with the selection from the server
+        const elective = electives.find(e => e.id === electiveId);
+        if (elective) {
+          const studentElective: StudentElective = {
+            id: data.selection?._id || `se_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            studentId,
+            electiveId,
+            semester,
+            dateSelected: data.selection?.createdAt || new Date().toISOString(),
+            track: elective.track
+          };
+
+          const updatedStudentElectives = [...studentElectives, studentElective];
+          setStudentElectives(updatedStudentElectives);
+        }
+        
+        // Refresh electives to get updated enrollment counts
+        await fetchElectives();
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error selecting elective:', error);
+      return false;
+    }
   };
 
   const getStudentElectives = (studentId: string): StudentElective[] => {
@@ -1198,7 +1426,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getElectivesByCategory = (category: 'Humanities' | 'Departmental' | 'Open Elective'): Elective[] => {
     const mappedCategory = category === 'Open Elective' ? 'Open' : category;
-    return electives.filter(e => e.category === mappedCategory);
+    return electives.filter(e => e.category.includes(mappedCategory));
   };
 
   const getElectivesByCategoryAndDepartment = (category: string, department?: string, semester?: number): Elective[] => {
@@ -1211,13 +1439,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // or if no eligibleDepartments is specified (backward compatibility)
         const hasEligibleDepts = e.eligibleDepartments && e.eligibleDepartments.length > 0;
         const isDeptEligible = department && hasEligibleDepts ? e.eligibleDepartments!.includes(department) : true;
-        categoryMatch = e.category === mappedCategory && (!hasEligibleDepts || isDeptEligible);
+        categoryMatch = e.category.includes(mappedCategory) && (!hasEligibleDepts || isDeptEligible);
       } else if (mappedCategory === 'Departmental') {
         // For Departmental electives, must match user's department
-        categoryMatch = e.category === mappedCategory && e.department === department;
+        categoryMatch = e.category.includes(mappedCategory) && e.department === department;
       } else {
         // For Humanities and other categories
-        categoryMatch = e.category === mappedCategory;
+        categoryMatch = e.category.includes(mappedCategory);
       }
       
       const semesterMatch = semester ? e.semester === semester : true;
@@ -1235,13 +1463,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getElectiveDeadline = (electiveId: string): string | null => {
     const elective = electives.find(e => e.id === electiveId);
-    return elective?.selectionDeadline || null;
+    // Check both deadline and selectionDeadline for backward compatibility
+    return elective?.deadline || elective?.selectionDeadline || null;
   };
 
   const isElectiveSelectionOpen = (electiveId: string): boolean => {
     const deadline = getElectiveDeadline(electiveId);
     if (!deadline) return true; // No deadline set means always open
-    return new Date() <= new Date(deadline);
+    
+    const now = new Date();
+    const deadlineDate = new Date(deadline);
+    
+    // Compare dates (deadline is inclusive - can select until end of deadline day)
+    return now <= deadlineDate;
   };
 
   // Get available departments from admin-configured data first, then fallback to electives and students data
@@ -1279,56 +1513,110 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Admin management functions for departments
-  const addDepartment = (department: string): boolean => {
+  const addDepartment = async (department: string): Promise<boolean> => {
     if (!department.trim() || adminDepartments.includes(department)) {
       return false;
     }
     const updatedDepartments = [...adminDepartments, department].sort();
     setAdminDepartments(updatedDepartments);
     localStorage.setItem('adminDepartments', JSON.stringify(updatedDepartments));
+    
+    // Sync with database
+    try {
+      await systemConfigApi.updateConfig({ departments: updatedDepartments });
+      console.log('✅ Department synced to database');
+    } catch (error) {
+      console.warn('⚠️ Could not sync department to database:', error);
+    }
+    
     return true;
   };
 
-  const removeDepartment = (department: string): boolean => {
+  const removeDepartment = async (department: string): Promise<boolean> => {
     const updatedDepartments = adminDepartments.filter(d => d !== department);
     setAdminDepartments(updatedDepartments);
     localStorage.setItem('adminDepartments', JSON.stringify(updatedDepartments));
+    
+    // Sync with database
+    try {
+      await systemConfigApi.updateConfig({ departments: updatedDepartments });
+      console.log('✅ Department removal synced to database');
+    } catch (error) {
+      console.warn('⚠️ Could not sync department removal to database:', error);
+    }
+    
     return true;
   };
 
   // Admin management functions for sections
-  const addSection = (section: string): boolean => {
+  const addSection = async (section: string): Promise<boolean> => {
     if (!section.trim() || adminSections.includes(section)) {
       return false;
     }
     const updatedSections = [...adminSections, section].sort();
     setAdminSections(updatedSections);
     localStorage.setItem('adminSections', JSON.stringify(updatedSections));
+    
+    // Sync with database
+    try {
+      await systemConfigApi.updateConfig({ sections: updatedSections });
+      console.log('✅ Section synced to database');
+    } catch (error) {
+      console.warn('⚠️ Could not sync section to database:', error);
+    }
+    
     return true;
   };
 
-  const removeSection = (section: string): boolean => {
+  const removeSection = async (section: string): Promise<boolean> => {
     const updatedSections = adminSections.filter(s => s !== section);
     setAdminSections(updatedSections);
     localStorage.setItem('adminSections', JSON.stringify(updatedSections));
+    
+    // Sync with database
+    try {
+      await systemConfigApi.updateConfig({ sections: updatedSections });
+      console.log('✅ Section removal synced to database');
+    } catch (error) {
+      console.warn('⚠️ Could not sync section removal to database:', error);
+    }
+    
     return true;
   };
 
   // Admin management functions for semesters
-  const addSemester = (semester: number): boolean => {
+  const addSemester = async (semester: number): Promise<boolean> => {
     if (semester <= 0 || adminSemesters.includes(semester)) {
       return false;
     }
     const updatedSemesters = [...adminSemesters, semester].sort((a, b) => a - b);
     setAdminSemesters(updatedSemesters);
     localStorage.setItem('adminSemesters', JSON.stringify(updatedSemesters));
+    
+    // Sync with database
+    try {
+      await systemConfigApi.updateConfig({ semesters: updatedSemesters });
+      console.log('✅ Semester synced to database');
+    } catch (error) {
+      console.warn('⚠️ Could not sync semester to database:', error);
+    }
+    
     return true;
   };
 
-  const removeSemester = (semester: number): boolean => {
+  const removeSemester = async (semester: number): Promise<boolean> => {
     const updatedSemesters = adminSemesters.filter(s => s !== semester);
     setAdminSemesters(updatedSemesters);
     localStorage.setItem('adminSemesters', JSON.stringify(updatedSemesters));
+    
+    // Sync with database
+    try {
+      await systemConfigApi.updateConfig({ semesters: updatedSemesters });
+      console.log('✅ Semester removal synced to database');
+    } catch (error) {
+      console.warn('⚠️ Could not sync semester removal to database:', error);
+    }
+    
     return true;
   };
 
@@ -1338,39 +1626,119 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ]);
 
   // Track management functions
-  const addTrack = (track: Omit<Track, 'id'>): boolean => {
+  const addTrack = async (track: Omit<Track, 'id'>): Promise<boolean> => {
     if (!track.name.trim() || tracks.some(t => t.name === track.name)) {
       return false;
     }
-    const newTrack: Track = {
-      ...track,
-      id: Date.now().toString()
-    };
-    const updatedTracks = [...tracks, newTrack];
-    setTracks(updatedTracks);
-    localStorage.setItem('tracks', JSON.stringify(updatedTracks));
-    return true;
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/tracks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          name: track.name,
+          department: track.department,
+          category: track.category
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add track');
+      }
+
+      const data = await response.json();
+      const newTrack: Track = {
+        id: data.track._id,
+        name: data.track.name,
+        department: data.track.department,
+        category: data.track.category,
+        color: track.color || '#3B82F6',
+        suggestedElectives: [],
+        prerequisites: [],
+        careerOutcomes: [],
+        estimatedHours: 0
+      };
+      
+      const updatedTracks = [...tracks, newTrack];
+      setTracks(updatedTracks);
+      localStorage.setItem('tracks', JSON.stringify(updatedTracks));
+      return true;
+    } catch (error) {
+      console.error('Error adding track:', error);
+      return false;
+    }
   };
 
-  const updateTrack = (id: string, updates: Partial<Track>): boolean => {
-    const updatedTracks = tracks.map(track => 
-      track.id === id ? { ...track, ...updates } : track
-    );
-    setTracks(updatedTracks);
-    localStorage.setItem('tracks', JSON.stringify(updatedTracks));
-    return true;
+  const updateTrack = async (id: string, updates: Partial<Track>): Promise<boolean> => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/tracks/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: JSON.stringify({
+          name: updates.name,
+          department: updates.department,
+          category: updates.category
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update track');
+      }
+
+      const data = await response.json();
+      const updatedTracks = tracks.map(track => 
+        track.id === id ? { 
+          ...track,
+          ...updates,
+          id: data.track._id,
+          name: data.track.name,
+          department: data.track.department,
+          category: data.track.category,
+          description: data.track.description
+        } : track
+      );
+      setTracks(updatedTracks);
+      localStorage.setItem('tracks', JSON.stringify(updatedTracks));
+      return true;
+    } catch (error) {
+      console.error('Error updating track:', error);
+      return false;
+    }
   };
 
-  const removeTrack = (id: string): boolean => {
+  const removeTrack = async (id: string): Promise<boolean> => {
     // Check if any electives are using this track
     const trackInUse = electives.some(e => e.track === tracks.find(t => t.id === id)?.name);
     if (trackInUse) {
       return false; // Cannot remove track that's in use
     }
-    const updatedTracks = tracks.filter(t => t.id !== id);
-    setTracks(updatedTracks);
-    localStorage.setItem('tracks', JSON.stringify(updatedTracks));
-    return true;
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/tracks/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete track');
+      }
+
+      const updatedTracks = tracks.filter(t => t.id !== id);
+      setTracks(updatedTracks);
+      localStorage.setItem('tracks', JSON.stringify(updatedTracks));
+      return true;
+    } catch (error) {
+      console.error('Error removing track:', error);
+      return false;
+    }
   };
 
   // Category management functions
@@ -1378,27 +1746,85 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return adminCategories;
   };
 
-  const addCategory = (category: string): boolean => {
+  const addCategory = async (category: string): Promise<boolean> => {
     if (adminCategories.includes(category)) {
       return false;
     }
+    
     const updatedCategories = [...adminCategories, category];
-    setAdminCategories(updatedCategories);
-    localStorage.setItem('adminCategories', JSON.stringify(updatedCategories));
-    return true;
+    
+    try {
+      // Save to database via API
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/system-config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          electiveCategories: updatedCategories
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Category saved to database:', category);
+        setAdminCategories(updatedCategories);
+        localStorage.setItem('adminCategories', JSON.stringify(updatedCategories));
+        return true;
+      } else {
+        console.error('❌ Failed to save category to database');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saving category:', error);
+      // Fallback to localStorage only
+      setAdminCategories(updatedCategories);
+      localStorage.setItem('adminCategories', JSON.stringify(updatedCategories));
+      return true;
+    }
   };
 
-  const removeCategory = (category: string): boolean => {
+  const removeCategory = async (category: string): Promise<boolean> => {
     // Check if any tracks or electives are using this category
     const categoryInUse = tracks.some(t => t.category === category) || 
-                          electives.some(e => e.category === category);
+                          electives.some(e => e.category.includes(category as any));
     if (categoryInUse) {
       return false; // Cannot remove category that's in use
     }
+    
     const updatedCategories = adminCategories.filter(c => c !== category);
-    setAdminCategories(updatedCategories);
-    localStorage.setItem('adminCategories', JSON.stringify(updatedCategories));
-    return true;
+    
+    try {
+      // Save to database via API
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/system-config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          electiveCategories: updatedCategories
+        })
+      });
+
+      if (response.ok) {
+        console.log('✅ Category removed from database:', category);
+        setAdminCategories(updatedCategories);
+        localStorage.setItem('adminCategories', JSON.stringify(updatedCategories));
+        return true;
+      } else {
+        console.error('❌ Failed to remove category from database');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error removing category:', error);
+      // Fallback to localStorage only
+      setAdminCategories(updatedCategories);
+      localStorage.setItem('adminCategories', JSON.stringify(updatedCategories));
+      return true;
+    }
   };
 
   const addElectiveFeedback = (feedback: Omit<ElectiveFeedbackForm, 'id'>) => {
@@ -1661,10 +2087,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (b.description.toLowerCase().includes(userPreferences.careerGoals.toLowerCase())) scoreB += 2;
         
         // Score based on difficulty preference
-        if (userPreferences.difficulty === 'easy' && a.category === 'Humanities') scoreA += 1;
-        if (userPreferences.difficulty === 'easy' && b.category === 'Humanities') scoreB += 1;
-        if (userPreferences.difficulty === 'challenging' && a.category === 'Departmental') scoreA += 1;
-        if (userPreferences.difficulty === 'challenging' && b.category === 'Departmental') scoreB += 1;
+        if (userPreferences.difficulty === 'easy' && a.category.includes('Humanities')) scoreA += 1;
+        if (userPreferences.difficulty === 'easy' && b.category.includes('Humanities')) scoreB += 1;
+        if (userPreferences.difficulty === 'challenging' && a.category.includes('Departmental')) scoreA += 1;
+        if (userPreferences.difficulty === 'challenging' && b.category.includes('Departmental')) scoreB += 1;
         
         return scoreB - scoreA; // Higher score first
       })
@@ -1794,24 +2220,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Syllabus management functions
   const uploadSyllabus = async (electiveId: string, file: File, description: string): Promise<boolean> => {
     try {
-      // Simulate file upload (in real app, upload to server/cloud storage)
-      const fileUrl = URL.createObjectURL(file);
-      const newSyllabus: Syllabus = {
-        id: Date.now().toString(),
+      // Convert PDF to base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result);
+          } else {
+            reject(new Error('Failed to read file'));
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const syllabusData: Omit<SyllabusData, 'id' | 'uploadedAt'> = {
         electiveId,
         title: `${file.name} - Syllabus`,
         description,
-        pdfUrl: fileUrl,
+        pdfData: base64Data,
         pdfFileName: file.name,
         uploadedBy: 'admin', // In real app, get from auth context
-        uploadedAt: new Date(),
         academicYear: '2024-25',
         semester: new Date().getMonth() >= 6 ? 1 : 2, // Simple logic
         version: 1,
         isActive: true
       };
 
-      // Deactivate previous versions
+      // Upload to MongoDB via API
+      const uploadedSyllabus = await syllabusApi.uploadSyllabus(syllabusData);
+      
+      // Convert uploadedAt to Date object
+      const newSyllabus: Syllabus = {
+        ...uploadedSyllabus,
+        uploadedAt: new Date(uploadedSyllabus.uploadedAt)
+      };
+
+      // Deactivate previous versions locally
       const updatedSyllabi = syllabi.map(s => 
         s.electiveId === electiveId ? { ...s, isActive: false } : s
       );
@@ -1819,9 +2264,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const finalSyllabi = [...updatedSyllabi, newSyllabus];
       setSyllabi(finalSyllabi);
       localStorage.setItem('syllabi', JSON.stringify(finalSyllabi));
+      
+      console.log('Syllabus uploaded to MongoDB successfully:', uploadedSyllabus);
       return true;
     } catch (error) {
-      console.error('Error uploading syllabus:', error);
+      console.error('Error uploading syllabus to MongoDB:', error);
       return false;
     }
   };
@@ -1850,12 +2297,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteSyllabus = async (syllabusId: string): Promise<boolean> => {
     try {
-      const updatedSyllabi = syllabi.filter(s => s.id !== syllabusId);
-      setSyllabi(updatedSyllabi);
-      localStorage.setItem('syllabi', JSON.stringify(updatedSyllabi));
-      return true;
+      // Delete from MongoDB via API
+      const success = await syllabusApi.deleteSyllabus(syllabusId);
+      
+      if (success) {
+        // Update local state
+        const updatedSyllabi = syllabi.filter(s => s.id !== syllabusId);
+        setSyllabi(updatedSyllabi);
+        localStorage.setItem('syllabi', JSON.stringify(updatedSyllabi));
+        console.log('Syllabus deleted from MongoDB successfully');
+        return true;
+      }
+      
+      return false;
     } catch (error) {
-      console.error('Error deleting syllabus:', error);
+      console.error('Error deleting syllabus from MongoDB:', error);
       return false;
     }
   };
@@ -1913,7 +2369,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
 
@@ -1928,6 +2384,38 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       console.error('Error deleting user:', error);
       return false;
+    }
+  };
+
+  // ============================================
+  // ELECTIVE LIMITS MANAGEMENT
+  // ============================================
+
+  /**
+   * Get elective limit for specific department, semester, and category
+   */
+  const getElectiveLimit = async (department: string, semester: number, category: string): Promise<number> => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return 1; // Default to 1 if not authenticated
+
+      const response = await fetch(
+        `${getApiBaseUrl()}/elective-limits/${department}/${semester}/${category}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) return 1; // Default to 1 if fetch fails
+
+      const data = await response.json();
+      return data.success ? data.limit : 1;
+    } catch (error) {
+      console.error('Error fetching elective limit:', error);
+      return 1; // Default to 1 on error
     }
   };
 
@@ -2002,6 +2490,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       getAllSyllabi,
       updateSyllabus,
       deleteSyllabus,
+      // Elective limit functions
+      getElectiveLimit,
     }}>
       {children}
     </DataContext.Provider>

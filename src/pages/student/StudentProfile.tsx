@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { User, Mail, Phone, Save, Building, Hash, CreditCard } from 'lucide-react';
+import { User, Mail, Phone, Save, Building, CreditCard } from 'lucide-react';
 
 const StudentProfile: React.FC = () => {
   const { user, updateProfile } = useAuth();
@@ -14,7 +14,7 @@ const StudentProfile: React.FC = () => {
     email: user?.email || '',
     rollNo: user?.rollNo || '',
     rollNumber: user?.rollNumber || '',
-    mobile: '', // Would be stored in user profile in real app
+    mobile: user?.mobile || '',
     department: user?.department || '',
     semester: user?.semester || 5,
     section: user?.section || ''
@@ -99,11 +99,7 @@ const StudentProfile: React.FC = () => {
                 <span className="font-medium text-gray-900 capitalize">{user.role}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Registration Number:</span>
-                <span className="font-medium text-gray-900">{user.rollNo}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Roll No:</span>
+                <span className="text-gray-600">Class Roll No:</span>
                 <span className="font-medium text-gray-900">{user.rollNumber}</span>
               </div>
               <div className="flex justify-between">
@@ -166,27 +162,8 @@ const StudentProfile: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="rollNo" className="block text-sm font-medium text-gray-700 mb-1">
-                    Registration Number
-                  </label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                    <input
-                      id="rollNo"
-                      name="rollNo"
-                      type="text"
-                      required
-                      value={formData.rollNo}
-                      onChange={handleChange}
-                      className="pl-10 block w-full px-3 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                      placeholder="e.g., 2223CRPFTAIE120"
-                    />
-                  </div>
-                </div>
-
-                <div>
                   <label htmlFor="rollNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                    Roll No
+                    Class Roll No
                   </label>
                   <div className="relative">
                     <CreditCard className="absolute left-3 top-3 h-5 w-5 text-gray-400" />

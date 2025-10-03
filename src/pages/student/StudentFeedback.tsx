@@ -14,8 +14,36 @@ const StudentFeedback: React.FC = () => {
 
   if (!user || user.role !== 'student') return null;
 
-  const feedbackTemplates = getActiveFeedbackTemplates();
+  const allTemplates = getActiveFeedbackTemplates();
   const submittedTemplates = getStudentSubmittedTemplates(user.id);
+
+  // Filter templates based on student's department, semester, and section
+  const feedbackTemplates = allTemplates.filter(template => {
+    // If no target filters are set, show to everyone
+    const hasNoFilters = !template.targetDepartment && !template.targetSemester && (!template.targetSection || (Array.isArray(template.targetSection) && template.targetSection.length === 0));
+    if (hasNoFilters) return true;
+
+    // Check department match
+    const departmentMatch = !template.targetDepartment || template.targetDepartment === user.department;
+    
+    // Check semester match
+    const semesterMatch = !template.targetSemester || template.targetSemester === user.semester;
+    
+    // Check section match (handles both string and array)
+    let sectionMatch = true;
+    if (template.targetSection) {
+      if (Array.isArray(template.targetSection)) {
+        // If it's an array, check if student's section is in the array
+        sectionMatch = template.targetSection.length === 0 || template.targetSection.some(s => s.toLowerCase() === user.section?.toLowerCase());
+      } else {
+        // If it's a string, do direct comparison
+        sectionMatch = template.targetSection.toLowerCase() === user.section?.toLowerCase();
+      }
+    }
+
+    // Template is visible if all specified filters match
+    return departmentMatch && semesterMatch && sectionMatch;
+  });
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
@@ -55,6 +83,7 @@ const StudentFeedback: React.FC = () => {
       studentName: user.name,
       studentDepartment: user.department,
       studentSemester: user.semester,
+      studentSection: user.section,
       responses: template.questions.map(q => ({
         questionId: q.id,
         question: q.question,

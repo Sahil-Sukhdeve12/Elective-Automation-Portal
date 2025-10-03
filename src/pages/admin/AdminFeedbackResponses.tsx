@@ -3,25 +3,37 @@ import { useData } from '../../contexts/DataContext';
 import { MessageSquare, User, Clock, Filter, Eye, Download, Star } from 'lucide-react';
 
 const AdminFeedbackResponses: React.FC = () => {
-  const { getFeedbackResponses, getActiveFeedbackTemplates } = useData();
+  const { 
+    getFeedbackResponses, 
+    getActiveFeedbackTemplates,
+    getAvailableDepartments,
+    getAvailableSemesters,
+    getAvailableSections
+  } = useData();
   
   const [selectedTemplate, setSelectedTemplate] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [selectedSemester, setSelectedSemester] = useState<string>('all');
+  const [selectedSection, setSelectedSection] = useState<string>('all');
   const [viewDetails, setViewDetails] = useState<string | null>(null);
 
   // Get all feedback responses and templates
   const allResponses = getFeedbackResponses();
   const templates = getActiveFeedbackTemplates();
 
-  // Filter responses based on selected template and department
+  // Filter responses based on selected filters
   const filteredResponses = allResponses.filter(response => {
     if (selectedTemplate !== 'all' && response.templateId !== selectedTemplate) return false;
     if (selectedDepartment !== 'all' && response.studentDepartment !== selectedDepartment) return false;
+    if (selectedSemester !== 'all' && response.studentSemester !== parseInt(selectedSemester)) return false;
+    if (selectedSection !== 'all' && response.studentSection !== selectedSection) return false;
     return true;
   });
 
-  // Get unique departments from responses
-  const departments = [...new Set(allResponses.map(r => r.studentDepartment).filter(Boolean))];
+  // Get available values from database (not just from responses)
+  const departments = getAvailableDepartments();
+  const semesters = getAvailableSemesters();
+  const sections = getAvailableSections();
 
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -78,12 +90,13 @@ const AdminFeedbackResponses: React.FC = () => {
 
   const exportResponses = () => {
     const csvContent = [
-      ['Student Name', 'Department', 'Semester', 'Template', 'Question', 'Answer', 'Submitted At'].join(','),
+      ['Student Name', 'Department', 'Semester', 'Section', 'Template', 'Question', 'Answer', 'Submitted At'].join(','),
       ...filteredResponses.flatMap(response =>
         response.responses.map(resp => [
           response.studentName,
           response.studentDepartment,
           response.studentSemester,
+          response.studentSection || 'N/A',
           response.templateTitle,
           resp.question.replace(/,/g, ';'),
           String(resp.answer).replace(/,/g, ';'),
@@ -168,7 +181,7 @@ const AdminFeedbackResponses: React.FC = () => {
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Feedback Template
@@ -204,6 +217,42 @@ const AdminFeedbackResponses: React.FC = () => {
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Semester
+            </label>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Semesters</option>
+              {semesters.map(sem => (
+                <option key={sem} value={sem}>
+                  Semester {sem}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Section
+            </label>
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Sections</option>
+              {sections.map(sec => (
+                <option key={sec} value={sec}>
+                  Section {sec}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -230,14 +279,27 @@ const AdminFeedbackResponses: React.FC = () => {
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       {response.templateTitle}
                     </h3>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      <span className="flex items-center">
+                    <div className="flex flex-wrap items-center gap-3 text-sm mt-2">
+                      <span className="flex items-center text-gray-700 dark:text-gray-300">
                         <User className="w-4 h-4 mr-1" />
                         {response.studentName}
                       </span>
-                      <span>{response.studentDepartment}</span>
-                      <span>Semester {response.studentSemester}</span>
-                      <span className="flex items-center">
+                      {response.studentDepartment && (
+                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-medium">
+                          {response.studentDepartment}
+                        </span>
+                      )}
+                      {response.studentSemester && (
+                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded text-xs font-medium">
+                          Semester {response.studentSemester}
+                        </span>
+                      )}
+                      {response.studentSection && (
+                        <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded text-xs font-medium">
+                          Section {response.studentSection}
+                        </span>
+                      )}
+                      <span className="flex items-center text-gray-600 dark:text-gray-400">
                         <Clock className="w-4 h-4 mr-1" />
                         {formatDate(response.submittedAt)}
                       </span>

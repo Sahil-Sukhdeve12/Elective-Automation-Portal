@@ -142,61 +142,13 @@ const AdminStudents: React.FC = () => {
     const reportStudents = getFilteredStudentsForReport();
     
     return reportStudents.map(student => {
-      const studentElectivesData = getStudentElectives(student.id);
-      const studentTracks = getStudenttracks(student.id);
-      const primaryTrack = studentTracks.sort((a, b) => b.count - a.count)[0];
-      
-      // Get electives by category breakdown for all categories
-      const departmentalTracks = getTracksByCategory('Departmental').map(t => t.name);
-      const openTracks = getTracksByCategory('Open').map(t => t.name);
-      const humanitiesTracks = getTracksByCategory('Humanities').map(t => t.name);
-      
-      const departmentalElectives = studentElectivesData.filter(se => departmentalTracks.includes(se.track));
-      const openElectives = studentElectivesData.filter(se => openTracks.includes(se.track));
-      const humanitiesElectives = studentElectivesData.filter(se => humanitiesTracks.includes(se.track));
-      
-      // Get electives by specific category if category filter is applied
-      let categoryElectives: typeof studentElectivesData = [];
-      if (reportFilters.category) {
-        const categoryTrackNames = getTracksByCategory(reportFilters.category).map(t => t.name);
-        categoryElectives = studentElectivesData.filter(se => categoryTrackNames.includes(se.track));
-      }
-      
-      // Get track-specific electives if track filter is applied
-      let trackElectives: typeof studentElectivesData = [];
-      if (reportFilters.track) {
-        trackElectives = studentElectivesData.filter(se => se.track === reportFilters.track);
-      }
-      
-      // Get specific elective if elective filter is applied
-      let specificElective: typeof studentElectivesData[0] | null = null;
-      if (reportFilters.elective) {
-        specificElective = studentElectivesData.find(se => se.electiveId === reportFilters.elective) || null;
-      }
-      
       return {
         'Roll No': student.rollNumber,
         'Name': student.name,
         'Email': student.email,
         'Department': student.department,
         'Semester': student.semester,
-        'Section': student.section,
-        'Total Electives': studentElectivesData.length,
-        'Primary Track': primaryTrack?.track || 'None',
-        'Primary Track Count': primaryTrack?.count || 0,
-        // Category Breakdown
-        'Departmental Electives': departmentalElectives.length,
-        'Departmental Electives List': departmentalElectives.map(se => se.elective?.name).join('; ') || 'None',
-        'Open Electives': openElectives.length,
-        'Open Electives List': openElectives.map(se => se.elective?.name).join('; ') || 'None',
-        'Humanities Electives': humanitiesElectives.length,
-        'Humanities Electives List': humanitiesElectives.map(se => se.elective?.name).join('; ') || 'None',
-        // Filter-specific data
-        'Category Electives': reportFilters.category ? categoryElectives.length : 'N/A',
-        'Track Electives': reportFilters.track ? trackElectives.length : 'N/A',
-        'Selected Elective': reportFilters.elective ? (specificElective ? specificElective.elective?.name : 'Not Selected') : 'N/A',
-        'All Electives List': studentElectivesData.map(se => se.elective?.name).join('; '),
-        'Tracks Distribution': studentTracks.map(t => `${t.track} (${t.count})`).join('; ')
+        'Section': student.section
       };
     });
   };
@@ -221,14 +173,11 @@ const AdminStudents: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } else if (format === 'pdf') {
-      const reportTitle = 'DETAILED STUDENT ELECTIVES REPORT';
+      const reportTitle = 'STUDENT ROSTER REPORT';
       const filterInfo = [
         reportFilters.department && `Department: ${reportFilters.department}`,
         reportFilters.semester && `Semester: ${reportFilters.semester}`,
-        reportFilters.section && `Section: ${reportFilters.section}`,
-        reportFilters.category && `Category: ${reportFilters.category}`,
-        reportFilters.track && `Track: ${reportFilters.track}`,
-        reportFilters.elective && `Elective: ${electives.find(e => e.id === reportFilters.elective)?.name}`
+        reportFilters.section && `Section: ${reportFilters.section}`
       ].filter(Boolean);
       
       const pdfContent = [
@@ -239,29 +188,15 @@ const AdminStudents: React.FC = () => {
         'FILTERS APPLIED:',
         ...filterInfo,
         '',
-        'DETAILED STUDENT DATA:',
+        'STUDENT DATA:',
         '',
         ...data.map((student, index) => [
           `${index + 1}. ${student.Name} (${student['Roll No']})`,
           `   Department: ${student.Department} | Semester: ${student.Semester} | Section: ${student.Section}`,
           `   Email: ${student.Email}`,
-          `   Total Electives: ${student['Total Electives']} | Primary Track: ${student['Primary Track']} (${student['Primary Track Count']})`,
-          '',
-          '   CATEGORY BREAKDOWN:',
-          `   ├─ Departmental: ${student['Departmental Electives']} elective(s)`,
-          student['Departmental Electives List'] !== 'None' && `      └─ ${student['Departmental Electives List']}`,
-          `   ├─ Open: ${student['Open Electives']} elective(s)`,
-          student['Open Electives List'] !== 'None' && `      └─ ${student['Open Electives List']}`,
-          `   └─ Humanities: ${student['Humanities Electives']} elective(s)`,
-          student['Humanities Electives List'] !== 'None' && `      └─ ${student['Humanities Electives List']}`,
-          '',
-          reportFilters.category && `   Filtered Category (${reportFilters.category}): ${student['Category Electives']} elective(s)`,
-          reportFilters.track && `   Filtered Track (${reportFilters.track}): ${student['Track Electives']} elective(s)`,
-          reportFilters.elective && `   Specific Elective: ${student['Selected Elective']}`,
-          `   Track Distribution: ${student['Tracks Distribution']}`,
           '─'.repeat(80),
           ''
-        ].filter(Boolean)).flat()
+        ]).flat()
       ].join('\n');
       
       const blob = new Blob([pdfContent], { type: 'text/plain;charset=utf-8;' });
@@ -285,9 +220,7 @@ const AdminStudents: React.FC = () => {
       'Email': student.email,
       'Department': student.department,
       'Semester': student.semester,
-      'Section': student.section,
-      'Electives Completed': getStudentElectives(student.id).length,
-      'Primary track': getStudenttracks(student.id).sort((a, b) => b.count - a.count)[0]?.track || 'None'
+      'Section': student.section
     }));
     
     if (format === 'excel') {
@@ -849,57 +782,6 @@ const AdminStudents: React.FC = () => {
                   )}
                 </div>
               </div>
-
-              {/* Category Statistics Preview */}
-              {getFilteredStudentsForReport().length > 0 && (
-                <div className="bg-blue-50 p-4 rounded-lg mb-6">
-                  <h4 className="font-medium text-blue-900 mb-3">Category Breakdown Statistics:</h4>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    {(() => {
-                      const reportData = generateReportData();
-                      const categoryStats = {
-                        departmental: {
-                          total: reportData.reduce((sum, student) => sum + Number(student['Departmental Electives']), 0),
-                          students: reportData.filter(student => Number(student['Departmental Electives']) > 0).length
-                        },
-                        open: {
-                          total: reportData.reduce((sum, student) => sum + Number(student['Open Electives']), 0),
-                          students: reportData.filter(student => Number(student['Open Electives']) > 0).length
-                        },
-                        humanities: {
-                          total: reportData.reduce((sum, student) => sum + Number(student['Humanities Electives']), 0),
-                          students: reportData.filter(student => Number(student['Humanities Electives']) > 0).length
-                        }
-                      };
-                      
-                      return (
-                        <>
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-blue-900">{categoryStats.departmental.total}</div>
-                            <div className="text-blue-700">Departmental</div>
-                            <div className="text-xs text-blue-600">{categoryStats.departmental.students} students</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-green-900">{categoryStats.open.total}</div>
-                            <div className="text-green-700">Open</div>
-                            <div className="text-xs text-green-600">{categoryStats.open.students} students</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-purple-900">{categoryStats.humanities.total}</div>
-                            <div className="text-purple-700">Humanities</div>
-                            <div className="text-xs text-purple-600">{categoryStats.humanities.students} students</div>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className="mt-3 pt-3 border-t border-blue-200">
-                    <div className="text-xs text-blue-600 text-center">
-                      Statistics show total electives selected and number of students in each category
-                    </div>
-                  </div>
-                </div>
-              )}
               
               {/* Export Options */}
               <div className="space-y-3">
@@ -910,8 +792,8 @@ const AdminStudents: React.FC = () => {
                 >
                   <FileText className="w-5 h-5 text-green-600 mr-3" />
                   <div className="text-left">
-                    <span className="block text-gray-900 font-medium">Export as Detailed CSV (.csv)</span>
-                    <span className="block text-sm text-gray-500">Includes all student data with elective details</span>
+                    <span className="block text-gray-900 font-medium">Export as CSV (.csv)</span>
+                    <span className="block text-sm text-gray-500">Student roster with basic information</span>
                   </div>
                 </button>
                 
@@ -922,8 +804,8 @@ const AdminStudents: React.FC = () => {
                 >
                   <FileText className="w-5 h-5 text-red-600 mr-3" />
                   <div className="text-left">
-                    <span className="block text-gray-900 font-medium">Export as Detailed Report (.txt)</span>
-                    <span className="block text-sm text-gray-500">Comprehensive text report with full analysis</span>
+                    <span className="block text-gray-900 font-medium">Export as Report (.txt)</span>
+                    <span className="block text-sm text-gray-500">Student roster report in text format</span>
                   </div>
                 </button>
               </div>

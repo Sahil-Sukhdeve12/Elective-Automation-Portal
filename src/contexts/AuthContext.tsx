@@ -47,7 +47,7 @@ interface RegisterUserData {
   role: 'student' | 'admin';           // User role for access control
   department?: string;                  // Academic department (for students)
   semester?: number;                    // Current semester (for students)
-  registrationNumber?: string;          // Registration/Roll number (for students)
+  registrationNumber?: string;          // Class Roll Number (for students)
   mobile?: string;                      // Mobile phone number
   section?: string;                     // Section (for students)
 }

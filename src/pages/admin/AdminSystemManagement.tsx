@@ -22,7 +22,7 @@ const AdminSystemManagement: React.FC = () => {
     removeCategory
   } = useData();
 
-  const [activeTab, setActiveTab] = useState<'tracks' | 'categories' | 'departments' | 'sections' | 'semesters'>('tracks');
+  const [activeTab, setActiveTab] = useState<'tracks' | 'categories' | 'departments' | 'sections' | 'semesters' | 'elective-limits'>('tracks');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<string | null>(null);
 
@@ -30,13 +30,11 @@ const AdminSystemManagement: React.FC = () => {
   const [trackForm, setTrackForm] = useState({
     name: '',
     department: '',
-    description: '',
     color: '#4F46E5',
     category: 'Departmental',
     suggestedElectives: [] as string[],
     prerequisites: [] as string[],
     careerOutcomes: [] as string[],
-    difficulty: 'Intermediate' as 'Beginner' | 'Intermediate' | 'Advanced',
     estimatedHours: 40
   });
 
@@ -46,22 +44,72 @@ const AdminSystemManagement: React.FC = () => {
   const [newSemester, setNewSemester] = useState(5);
   const [newCategory, setNewCategory] = useState(''); // Changed to string to allow custom input
 
+  // Elective limit form state
+  const [limitForm, setLimitForm] = useState({
+    department: '',
+    semester: 5,
+    category: '',
+    maxElectives: 1
+  });
+
+  // Saved elective limits
+  const [electiveLimits, setElectiveLimits] = useState<Array<{
+    _id: string;
+    department: string;
+    semester: number;
+    category: string;
+    maxElectives: number;
+    isActive: boolean;
+  }>>([]);
+
   const departments = getAvailableDepartments();
   const sections = getAvailableSections();
   const semesters = getAvailableSemesters();
   const categories = getAvailableCategories();
 
+  // Fetch elective limits
+  const fetchElectiveLimits = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 
+        (import.meta.env.MODE === 'production' 
+          ? 'https://elective-selection-system.onrender.com/api' 
+          : 'http://localhost:5000/api');
+      
+      const response = await fetch(`${apiBaseUrl}/elective-limits`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setElectiveLimits(data.limits);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching elective limits:', error);
+    }
+  }, []);
+
+  // Fetch limits on mount and when tab changes to elective-limits
+  React.useEffect(() => {
+    if (activeTab === 'elective-limits') {
+      fetchElectiveLimits();
+    }
+  }, [activeTab, fetchElectiveLimits]);
+
   const resetTrackForm = () => {
     setTrackForm({
       name: '',
       department: '',
-      description: '',
       color: '#4F46E5',
       category: 'Departmental',
       suggestedElectives: [],
       prerequisites: [],
       careerOutcomes: [],
-      difficulty: 'Intermediate',
       estimatedHours: 40
     });
     setShowAddForm(false);
@@ -93,14 +141,12 @@ const AdminSystemManagement: React.FC = () => {
     setTrackForm({
       name: track.name,
       department: track.department,
-      description: track.description,
       color: track.color,
       category: track.category,
       suggestedElectives: track.suggestedElectives || [],
       prerequisites: track.prerequisites || [],
       careerOutcomes: track.careerOutcomes || [],
-      difficulty: track.difficulty,
-      estimatedHours: track.estimatedHours
+      estimatedHours: track.estimatedHours || 40
     });
     setShowAddForm(true);
   };
@@ -145,7 +191,7 @@ const AdminSystemManagement: React.FC = () => {
     }
   };
 
-  const handleAddCategory = useCallback(() => {
+  const handleAddCategory = useCallback(async () => {
     const categoryName = newCategory.trim();
     
     if (!categoryName) {
@@ -159,9 +205,10 @@ const AdminSystemManagement: React.FC = () => {
     }
     
     try {
-      const success = addCategory(categoryName);
+      const success = await addCategory(categoryName);
       if (success) {
         setNewCategory(''); // Reset the input field
+        alert(`Category "${categoryName}" added successfully!`);
       } else {
         alert(`Category "${categoryName}" already exists!`);
       }
@@ -190,14 +237,15 @@ const AdminSystemManagement: React.FC = () => {
                 { id: 'categories', label: 'Categories', icon: Tag },
                 { id: 'departments', label: 'Departments', icon: Settings },
                 { id: 'sections', label: 'Sections', icon: Settings },
-                { id: 'semesters', label: 'Semesters', icon: Settings }
+                { id: 'semesters', label: 'Semesters', icon: Settings },
+                { id: 'elective-limits', label: 'Elective Limits', icon: Settings }
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => {
-                      setActiveTab(tab.id as 'tracks' | 'categories' | 'departments' | 'sections' | 'semesters');
+                      setActiveTab(tab.id as 'tracks' | 'categories' | 'departments' | 'sections' | 'semesters' | 'elective-limits');
                       setShowAddForm(false);
                       setEditingItem(null);
                     }}
@@ -288,34 +336,6 @@ const AdminSystemManagement: React.FC = () => {
                           ))}
                         </select>
                       </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Difficulty
-                        </label>
-                        <select
-                          value={trackForm.difficulty}
-                          onChange={(e) => setTrackForm(prev => ({ ...prev, difficulty: e.target.value as 'Beginner' | 'Intermediate' | 'Advanced' }))}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
-                        >
-                          <option value="Beginner">Beginner</option>
-                          <option value="Intermediate">Intermediate</option>
-                          <option value="Advanced">Advanced</option>
-                        </select>
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Description
-                        </label>
-                        <textarea
-                          value={trackForm.description}
-                          onChange={(e) => setTrackForm(prev => ({ ...prev, description: e.target.value }))}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
-                          placeholder="Enter track description"
-                        />
-                      </div>
                     </div>
 
                     <div className="flex gap-3 mt-6">
@@ -352,11 +372,8 @@ const AdminSystemManagement: React.FC = () => {
                               {track.category}
                             </span>
                           </div>
-                          <p className="text-gray-600 dark:text-gray-400 mb-2">{track.description}</p>
-                          <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex gap-4 text-sm text-gray-500 dark:text-gray-400 mt-2">
                             <span>Department: {track.department}</span>
-                            <span>Difficulty: {track.difficulty}</span>
-                            <span>Hours: {track.estimatedHours}</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -422,10 +439,12 @@ const AdminSystemManagement: React.FC = () => {
                           </p>
                         </div>
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             if (window.confirm(`Are you sure you want to remove the ${category} category?`)) {
-                              const success = removeCategory(category);
-                              if (!success) {
+                              const success = await removeCategory(category);
+                              if (success) {
+                                alert(`Category "${category}" removed successfully!`);
+                              } else {
                                 alert('Cannot remove category that is currently in use.');
                               }
                             }
@@ -573,6 +592,230 @@ const AdminSystemManagement: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Elective Limits Management */}
+            {activeTab === 'elective-limits' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Elective Limits Management</h2>
+                  <button
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Limit
+                  </button>
+                </div>
+
+                {showAddForm && (
+                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg mb-6">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      Add Elective Limit
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Department
+                        </label>
+                        <select
+                          value={limitForm.department}
+                          onChange={(e) => setLimitForm(prev => ({ ...prev, department: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
+                        >
+                          <option value="">Select Department</option>
+                          {departments.map(dept => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Semester
+                        </label>
+                        <select
+                          value={limitForm.semester}
+                          onChange={(e) => setLimitForm(prev => ({ ...prev, semester: parseInt(e.target.value) }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
+                        >
+                          {semesters.map(sem => (
+                            <option key={sem} value={sem}>Semester {sem}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Category
+                        </label>
+                        <select
+                          value={limitForm.category}
+                          onChange={(e) => setLimitForm(prev => ({ ...prev, category: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
+                        >
+                          <option value="">Select Category</option>
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max Electives
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={limitForm.maxElectives}
+                          onChange={(e) => setLimitForm(prev => ({ ...prev, maxElectives: parseInt(e.target.value) || 1 }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={async () => {
+                          if (!limitForm.department || !limitForm.category) {
+                            alert('Please select both department and category');
+                            return;
+                          }
+
+                          try {
+                            const token = localStorage.getItem('authToken');
+                            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 
+                              (import.meta.env.MODE === 'production' 
+                                ? 'https://elective-selection-system.onrender.com/api' 
+                                : 'http://localhost:5000/api');
+                            
+                            const response = await fetch(`${apiBaseUrl}/elective-limits`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              },
+                              body: JSON.stringify(limitForm)
+                            });
+
+                            if (response.ok) {
+                              alert('Elective limit saved successfully!');
+                              setLimitForm({ department: '', semester: 5, category: '', maxElectives: 1 });
+                              setShowAddForm(false);
+                              // Refresh the list
+                              fetchElectiveLimits();
+                            } else {
+                              alert('Failed to save elective limit');
+                            }
+                          } catch (error) {
+                            console.error('Error saving limit:', error);
+                            alert('Error saving elective limit');
+                          }
+                        }}
+                        disabled={!limitForm.department || !limitForm.category}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        <Save className="w-4 h-4" />
+                        Save Limit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setLimitForm({ department: '', semester: 5, category: '', maxElectives: 1 });
+                        }}
+                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Current Limits</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Configure how many electives students can select per category, department, and semester.
+                  </p>
+                  
+                  {electiveLimits.length === 0 ? (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      No elective limits configured yet. Add limits using the form above.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200 dark:border-gray-600">
+                            <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">Department</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">Semester</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">Category</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">Max Electives</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                            <th className="text-left py-3 px-4 font-medium text-gray-700 dark:text-gray-300">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {electiveLimits.map((limit) => (
+                            <tr key={limit._id} className="border-b border-gray-100 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600">
+                              <td className="py-3 px-4 text-gray-900 dark:text-white">{limit.department}</td>
+                              <td className="py-3 px-4 text-gray-900 dark:text-white">Semester {limit.semester}</td>
+                              <td className="py-3 px-4 text-gray-900 dark:text-white">{limit.category}</td>
+                              <td className="py-3 px-4 text-gray-900 dark:text-white font-semibold">{limit.maxElectives}</td>
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  limit.isActive 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                }`}>
+                                  {limit.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <button
+                                  onClick={async () => {
+                                    if (window.confirm('Are you sure you want to delete this limit?')) {
+                                      try {
+                                        const token = localStorage.getItem('authToken');
+                                        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 
+                                          (import.meta.env.MODE === 'production' 
+                                            ? 'https://elective-selection-system.onrender.com/api' 
+                                            : 'http://localhost:5000/api');
+                                        
+                                        const response = await fetch(`${apiBaseUrl}/elective-limits/${limit._id}`, {
+                                          method: 'DELETE',
+                                          headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${token}`
+                                          }
+                                        });
+
+                                        if (response.ok) {
+                                          alert('Limit deleted successfully!');
+                                          fetchElectiveLimits();
+                                        } else {
+                                          alert('Failed to delete limit');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error deleting limit:', error);
+                                        alert('Error deleting limit');
+                                      }
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                  title="Delete limit"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

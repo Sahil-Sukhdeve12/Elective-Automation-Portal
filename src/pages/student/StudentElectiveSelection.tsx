@@ -323,13 +323,23 @@ const StudentElectiveSelection: React.FC = () => {
               const isSelected = selectedCategories.has(category.id);
               const canSelect = canSelectFromCategory(category.id);
               
+              // Get the selected elective for this category
+              const selectedElective = selectedElectivesThisSemester.find(se => {
+                const elec = electives.find(e => e.id === se.electiveId);
+                return elec?.category.includes(category.id);
+              });
+              
+              const selectedElectiveData = selectedElective 
+                ? electives.find(e => e.id === selectedElective.electiveId)
+                : null;
+              
               return (
                 <div
                   key={category.id}
                   onClick={() => canSelect && handleCategorySelect(category.id)}
                   className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center transform transition-all duration-200 ${
-                    canSelect ? 'cursor-pointer hover:scale-105 hover:shadow-xl' : 'opacity-50'
-                  } ${isSelected ? 'ring-2 ring-green-500' : ''}`}
+                    canSelect ? 'cursor-pointer hover:scale-105 hover:shadow-xl' : 'cursor-not-allowed'
+                  } ${isSelected ? 'ring-4 ring-green-500 bg-green-50 dark:bg-green-900/10' : ''}`}
                 >
                   <div className={`${category.color} w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6`}>
                     <Icon className="w-8 h-8 text-white" />
@@ -337,16 +347,28 @@ const StudentElectiveSelection: React.FC = () => {
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                     {category.title}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
                     {category.description}
                   </p>
-                  {isSelected ? (
-                    <div className="flex items-center justify-center text-green-600 dark:text-green-400 font-medium">
-                      <Check className="w-4 h-4 mr-2" />
-                      Selected
+                  
+                  {isSelected && selectedElectiveData ? (
+                    <div className="mt-4 p-4 bg-green-100 dark:bg-green-900/30 rounded-lg border-2 border-green-500">
+                      <div className="flex items-center justify-center text-green-700 dark:text-green-300 font-bold mb-2">
+                        <Check className="w-5 h-5 mr-2" />
+                        Already Selected
+                      </div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300">
+                        <p className="font-semibold">{selectedElectiveData.name}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          {selectedElectiveData.code} • {selectedElectiveData.credits} Credits
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Track: {selectedElectiveData.track}
+                        </p>
+                      </div>
                     </div>
                   ) : canSelect ? (
-                    <div className="flex items-center justify-center text-blue-600 dark:text-blue-400 font-medium">
+                    <div className="flex items-center justify-center text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300">
                       Select Category
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </div>

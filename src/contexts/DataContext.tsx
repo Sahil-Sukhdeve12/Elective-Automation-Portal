@@ -203,8 +203,11 @@ const fetchStudentSelections = async () => {
       return [];
     }
 
-    console.log('🔄 Fetching student selections from /api/student/selections...');
-    const response = await fetch(`${getApiBaseUrl()}/student/selections`, {
+    const apiUrl = `${getApiBaseUrl()}/student/selections`;
+    console.log('🔄 Fetching student selections from:', apiUrl);
+    console.log('📝 Using auth token:', authToken.substring(0, 20) + '...');
+    
+    const response = await fetch(apiUrl, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json'
@@ -216,17 +219,22 @@ const fetchStudentSelections = async () => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Failed to fetch student selections:', response.status, errorText);
+      console.error('❌ API URL was:', apiUrl);
+      console.error('❌ Check if backend server is running and endpoint exists');
       return [];
     }
 
     const data = await response.json();
-    console.log('📊 Raw student selections from API:', data);
-    console.log('   - Success:', data.success);
-    console.log('   - Selections count:', data.selections?.length || 0);
+    console.log('📊 Raw API response:', data);
+    console.log('   ✓ Success:', data.success);
+    console.log('   ✓ Selections array:', data.selections);
+    console.log('   ✓ Selections count:', data.selections?.length || 0);
     
     if (data.success && data.selections) {
+      console.log('🔄 Mapping', data.selections.length, 'selections to frontend format...');
+      
       // Map backend selections to frontend format
-      const mappedSelections = data.selections.map((selection: any) => {
+      const mappedSelections = data.selections.map((selection: any, index: number) => {
         // electiveId is populated, so it's an object with _id, name, track, etc.
         const electiveId = typeof selection.electiveId === 'object' 
           ? (selection.electiveId._id || selection.electiveId.id)
@@ -236,11 +244,14 @@ const fetchStudentSelections = async () => {
           ? (selection.electiveId.track || '')
           : '';
         
-        console.log('📝 Mapping selection:', {
-          id: selection._id,
-          electiveId,
-          track,
-          semester: selection.semester
+        console.log(`   [${index + 1}/${data.selections.length}] Selection:`, {
+          _id: selection._id,
+          studentId: selection.studentId,
+          electiveId: electiveId,
+          electiveName: selection.electiveId?.name || 'Unknown',
+          track: track,
+          semester: selection.semester,
+          status: selection.status
         });
 
         return {
@@ -255,11 +266,12 @@ const fetchStudentSelections = async () => {
         };
       });
 
-      console.log('✅ Mapped selections:', mappedSelections);
+      console.log('✅ Successfully mapped', mappedSelections.length, 'selections');
+      console.log('📋 First selection sample:', mappedSelections[0]);
       return mappedSelections;
     }
     
-    console.log('⚠️ No selections found in API response');
+    console.log('⚠️ No selections found in API response (data.success:', data.success, ', data.selections:', data.selections, ')');
     return [];
   } catch (error) {
     console.error('❌ Error fetching student selections:', error);
@@ -1573,7 +1585,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getStudentElectives = (studentId: string): StudentElective[] => {
-    return studentElectives.filter(se => se.studentId === studentId);
+    console.log('🔍 Getting electives for student:', studentId);
+    console.log('   📊 Total studentElectives in state:', studentElectives.length);
+    console.log('   📋 All student IDs in electives:', [...new Set(studentElectives.map(se => se.studentId))]);
+    
+    const filtered = studentElectives.filter(se => se.studentId === studentId);
+    console.log('   ✅ Filtered electives for this student:', filtered.length);
+    
+    if (filtered.length > 0) {
+      console.log('   📝 Sample selection:', {
+        id: filtered[0].id,
+        electiveId: filtered[0].electiveId,
+        track: filtered[0].track,
+        semester: filtered[0].semester
+      });
+    } else {
+      console.warn('   ⚠️ No electives found for student ID:', studentId);
+      console.warn('   💡 Check if student ID matches the IDs in studentElectives array');
+    }
+    
+    return filtered;
   };
 
   const getRecommendations = (studentId: string, semester: number): Elective[] => {

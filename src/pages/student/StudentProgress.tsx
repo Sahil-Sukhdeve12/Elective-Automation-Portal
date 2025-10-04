@@ -55,7 +55,12 @@ const StudentProgress: React.FC = () => {
   // Get current semester
   const currentSemester = user.semester || 1;
   
-  const allSemesters = Array.from({ length: 8 }, (_, i) => i + 1);
+  // Only show semesters that have selections (from database)
+  const semestersWithSelections = Object.keys(electivesBySemester)
+    .map(Number)
+    .sort((a, b) => a - b);
+  
+  console.log('📅 Semesters with selections:', semestersWithSelections);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -117,39 +122,44 @@ const StudentProgress: React.FC = () => {
           Previous Elective Selections
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {allSemesters.map(semester => {
-            const semesterElectives = electivesBySemester[semester] || [];
-            const isPast = semester < currentSemester;
-            const isCurrent = semester === currentSemester;
-            
-            return (
-              <div 
-                key={semester}
-                className={`p-4 rounded-lg border-2 ${
-                  isPast ? 'bg-green-50 border-green-200' :
-                  isCurrent ? 'bg-blue-50 border-blue-200' :
-                  'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={`font-semibold ${
-                    isPast ? 'text-green-800' :
-                    isCurrent ? 'text-blue-800' :
-                    'text-gray-600'
-                  }`}>
-                    Semester {semester}
-                  </h3>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    isPast ? 'bg-green-100 text-green-800' :
-                    isCurrent ? 'bg-blue-100 text-blue-800' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
-                    {isPast ? 'Completed' : isCurrent ? 'Current' : 'Upcoming'}
-                  </span>
-                </div>
-                
-                {semesterElectives.length > 0 ? (
+        {semestersWithSelections.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <p className="text-gray-500 text-lg">No electives taken yet</p>
+            <p className="text-gray-400 text-sm mt-2">Start selecting electives to see your progress here</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {semestersWithSelections.map((semester: number) => {
+              const semesterElectives = electivesBySemester[semester] || [];
+              const isPast = semester < currentSemester;
+              const isCurrent = semester === currentSemester;
+              
+              return (
+                <div 
+                  key={semester}
+                  className={`p-4 rounded-lg border-2 ${
+                    isPast ? 'bg-green-50 border-green-200' :
+                    isCurrent ? 'bg-blue-50 border-blue-200' :
+                    'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className={`font-semibold ${
+                      isPast ? 'text-green-800' :
+                      isCurrent ? 'text-blue-800' :
+                      'text-gray-600'
+                    }`}>
+                      Semester {semester}
+                    </h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      isPast ? 'bg-green-100 text-green-800' :
+                      isCurrent ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {isPast ? 'Completed' : isCurrent ? 'Current' : 'Upcoming'}
+                    </span>
+                  </div>
+                  
                   <div className="space-y-2">
                     {semesterElectives.map(se => {
                       const elective = electives.find(e => e.id === se.electiveId);
@@ -188,23 +198,11 @@ const StudentProgress: React.FC = () => {
                       );
                     })}
                   </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <div className={`text-xs ${
-                      isPast ? 'text-green-600' :
-                      isCurrent ? 'text-blue-600' :
-                      'text-gray-500'
-                    }`}>
-                      {isPast ? 'No electives taken' :
-                       isCurrent ? 'No electives selected yet' :
-                       'Not yet available'}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

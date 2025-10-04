@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData, Student } from '../../contexts/DataContext';
-import { Search, Download, Users, FileText, CheckCircle, Filter, X } from 'lucide-react';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { Search, Download, Users, FileText, CheckCircle, Filter, X, RefreshCw } from 'lucide-react';
 
 interface ReportFilters {
   department: string;
@@ -21,8 +22,10 @@ const AdminStudents: React.FC = () => {
     getAvailableSections,
     getAvailableSemesters,
     getTracksByCategory,
-    getAvailableCategories
+    getAvailableCategories,
+    refreshUsers
   } = useData();
+  const { addNotification } = useNotifications();
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [semesterFilter, setSemesterFilter] = useState('');
@@ -30,6 +33,7 @@ const AdminStudents: React.FC = () => {
   const [trackFilter, settrackFilter] = useState('');
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showAdvancedReport, setShowAdvancedReport] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [reportFilters, setReportFilters] = useState<ReportFilters>({
     department: '',
     semester: '',
@@ -273,6 +277,36 @@ const AdminStudents: React.FC = () => {
     settrackFilter('');
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const success = await refreshUsers();
+      if (success) {
+        addNotification({
+          type: 'success',
+          title: 'Students Refreshed',
+          message: `Successfully loaded ${students.length} student(s) from database`
+        });
+        console.log('✅ Students refreshed successfully');
+      } else {
+        addNotification({
+          type: 'warning',
+          title: 'Refresh Failed',
+          message: 'Could not fetch latest student data from server'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing students:', error);
+      addNotification({
+        type: 'error',
+        title: 'Error',
+        message: 'An error occurred while refreshing student data'
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
@@ -283,6 +317,15 @@ const AdminStudents: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh student data"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
           <button
             onClick={() => setShowExportDialog(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"

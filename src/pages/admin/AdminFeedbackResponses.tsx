@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { MessageSquare, User, Clock, Filter, Eye, Download, Star } from 'lucide-react';
+import { MessageSquare, User, Clock, Filter, Eye, Download, Star, Trash2 } from 'lucide-react';
 
 const AdminFeedbackResponses: React.FC = () => {
   const { 
@@ -8,7 +8,8 @@ const AdminFeedbackResponses: React.FC = () => {
     getActiveFeedbackTemplates,
     getAvailableDepartments,
     getAvailableSemesters,
-    getAvailableSections
+    getAvailableSections,
+    deleteFeedbackResponse
   } = useData();
   
   const [selectedTemplate, setSelectedTemplate] = useState<string>('all');
@@ -112,6 +113,12 @@ const AdminFeedbackResponses: React.FC = () => {
     a.download = `feedback_responses_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteResponse = (responseId: string, studentName: string) => {
+    if (window.confirm(`Are you sure you want to delete the feedback response from ${studentName}?`)) {
+      deleteFeedbackResponse(responseId);
+    }
   };
 
   return (
@@ -305,13 +312,23 @@ const AdminFeedbackResponses: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setViewDetails(viewDetails === response.id ? null : response.id)}
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center"
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    {viewDetails === response.id ? 'Hide' : 'View'} Details
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setViewDetails(viewDetails === response.id ? null : response.id)}
+                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      {viewDetails === response.id ? 'Hide' : 'View'} Details
+                    </button>
+                    <button
+                      onClick={() => handleDeleteResponse(response.id, response.studentName)}
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 flex items-center"
+                      title="Delete response"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
 
                 {viewDetails === response.id && (

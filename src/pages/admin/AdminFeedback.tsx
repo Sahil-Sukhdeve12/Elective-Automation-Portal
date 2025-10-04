@@ -10,7 +10,8 @@ const AdminFeedback: React.FC = () => {
     getFeedbackResponses,
     getAvailableDepartments,
     getAvailableSemesters,
-    getAvailableSections
+    getAvailableSections,
+    electives
   } = useData();
   
   // Get all templates and responses
@@ -26,6 +27,7 @@ const AdminFeedback: React.FC = () => {
     title: '',
     description: '',
     targetCategory: 'Departmental' as 'Departmental' | 'Open' | 'Humanities',
+    targetElectiveName: '', // NEW: For selecting specific elective
     targetDepartment: '',
     targetSemester: undefined as number | undefined,
     targetSection: [] as string[],
@@ -41,6 +43,15 @@ const AdminFeedback: React.FC = () => {
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // Get unique categories from electives
+  const availableCategories = Array.from(new Set(electives.flatMap(e => e.category || [])));
+  
+  // Get elective names based on selected category
+  const getElectivesByCategory = () => {
+    if (!newTemplate.targetCategory) return [];
+    return electives.filter(e => e.category.includes(newTemplate.targetCategory));
+  };
+
   const addQuestion = () => {
     setNewTemplate(prev => ({
       ...prev,
@@ -54,11 +65,45 @@ const AdminFeedback: React.FC = () => {
     }));
   };
 
-  const updateQuestion = (index: number, field: string, value: string | boolean) => {
+  const updateQuestion = (index: number, field: string, value: string | boolean | string[]) => {
     setNewTemplate(prev => ({
       ...prev,
       questions: prev.questions.map((q, i) => 
         i === index ? { ...q, [field]: value } : q
+      )
+    }));
+  };
+
+  const addMCQOption = (questionIndex: number) => {
+    setNewTemplate(prev => ({
+      ...prev,
+      questions: prev.questions.map((q, i) => 
+        i === questionIndex ? { ...q, options: [...q.options, ''] } : q
+      )
+    }));
+  };
+
+  const updateMCQOption = (questionIndex: number, optionIndex: number, value: string) => {
+    setNewTemplate(prev => ({
+      ...prev,
+      questions: prev.questions.map((q, i) => 
+        i === questionIndex 
+          ? { 
+              ...q, 
+              options: q.options.map((opt, j) => j === optionIndex ? value : opt) 
+            } 
+          : q
+      )
+    }));
+  };
+
+  const removeMCQOption = (questionIndex: number, optionIndex: number) => {
+    setNewTemplate(prev => ({
+      ...prev,
+      questions: prev.questions.map((q, i) => 
+        i === questionIndex 
+          ? { ...q, options: q.options.filter((_, j) => j !== optionIndex) } 
+          : q
       )
     }));
   };
@@ -88,6 +133,7 @@ const AdminFeedback: React.FC = () => {
         title: '',
         description: '',
         targetCategory: 'Departmental',
+        targetElectiveName: '', // Reset elective name
         targetDepartment: '',
         targetSemester: undefined,
         targetSection: [],
@@ -196,15 +242,60 @@ const AdminFeedback: React.FC = () => {
               </label>
               <select
                 value={newTemplate.targetCategory}
-                onChange={(e) => setNewTemplate(prev => ({ ...prev, targetCategory: e.target.value as 'Departmental' | 'Open' | 'Humanities' }))}
+                onChange={(e) => setNewTemplate(prev => ({ 
+                  ...prev, 
+                  targetCategory: e.target.value as 'Departmental' | 'Open' | 'Humanities',
+                  targetElectiveName: '' // Reset elective when category changes
+                }))}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
                          bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="Departmental">Departmental</option>
-                <option value="Open">Open</option>
-                <option value="Humanities">Humanities</option>
+                <option value="">Select Category</option>
+                {availableCategories.length > 0 ? (
+                  availableCategories.map(category => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Departmental">Departmental</option>
+                    <option value="Open">Open</option>
+                    <option value="Humanities">Humanities</option>
+                  </>
+                )}
               </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Categories are loaded from electives in the database
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Elective Name (Optional)
+              </label>
+              <select
+                value={newTemplate.targetElectiveName}
+                onChange={(e) => setNewTemplate(prev => ({ ...prev, targetElectiveName: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                         focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!newTemplate.targetCategory}
+              >
+                <option value="">All Electives in Category</option>
+                {newTemplate.targetCategory && getElectivesByCategory().map(elective => (
+                  <option key={elective.id} value={elective.name}>
+                    {elective.name} ({elective.code || 'N/A'})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {!newTemplate.targetCategory 
+                  ? 'Select a category first to see available electives'
+                  : 'Leave blank to show feedback for all electives in the category'
+                }
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -331,7 +422,56 @@ const AdminFeedback: React.FC = () => {
                         <option value="yes-no">Yes/No</option>
                       </select>
                     </div>
-                    <div className="flex items-center justify-between">
+                    
+                    {/* MCQ Options - Show when type is multiple-choice */}
+                    {question.type === 'multiple-choice' && (
+                      <div className="mt-3 ml-4 space-y-2">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          Multiple Choice Options:
+                        </label>
+                        {question.options.map((option, optIndex) => (
+                          <div key={optIndex} className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-500 dark:text-gray-400 w-6">
+                              {String.fromCharCode(65 + optIndex)}.
+                            </span>
+                            <input
+                              type="text"
+                              value={option}
+                              onChange={(e) => updateMCQOption(index, optIndex, e.target.value)}
+                              className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded 
+                                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                                       focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
+                              required
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeMCQOption(index, optIndex)}
+                              className="text-red-500 hover:text-red-700 dark:text-red-400"
+                              disabled={question.options.length <= 2}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => addMCQOption(index)}
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 
+                                   text-xs flex items-center space-x-1"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <span>Add Option</span>
+                        </button>
+                        {question.options.length < 2 && (
+                          <p className="text-xs text-red-500 dark:text-red-400">
+                            ⚠ At least 2 options required for multiple choice
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between mt-2">
                       <label className="flex items-center">
                         <input
                           type="checkbox"
@@ -467,21 +607,6 @@ const AdminFeedback: React.FC = () => {
           ))
         )}
       </div>
-
-      {/* Responses Summary */}
-      {feedbackResponses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Responses</h2>
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-            <p className="text-gray-600 dark:text-gray-400">
-              You have {feedbackResponses.length} feedback responses. 
-              <span className="text-blue-600 dark:text-blue-400 ml-1 cursor-pointer hover:underline">
-                View all responses →
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -8,30 +8,47 @@ const AdminSyllabus: React.FC = () => {
     electives, 
     getAllSyllabi, 
     uploadSyllabus, 
-    deleteSyllabus 
+    deleteSyllabus,
+    getAvailableDepartments,
+    getAvailableSemesters
   } = useData();
   const { addNotification } = useNotifications();
 
   const [selectedElective, setSelectedElective] = useState<string>('');
   const [description, setDescription] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadType, setUploadType] = useState<'elective' | 'complete'>('elective');
+  const [targetDepartment, setTargetDepartment] = useState<string>('all');
+  const [targetSemester, setTargetSemester] = useState<string>('all');
 
   const allSyllabi = getAllSyllabi();
+  const departments = getAvailableDepartments();
+  const semesters = getAvailableSemesters();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      if (selectedFile.type === 'application/pdf') {
-        setFile(selectedFile);
-      } else {
+    const selectedFiles = e.target.files;
+    if (selectedFiles && selectedFiles.length > 0) {
+      const pdfFiles = Array.from(selectedFiles).filter(file => file.type === 'application/pdf');
+      
+      if (pdfFiles.length === 0) {
         addNotification({
           type: 'error',
           title: 'Invalid File Type',
-          message: 'Please select a PDF file.'
+          message: 'Please select PDF files only.'
+        });
+        return;
+      }
+
+      if (pdfFiles.length < selectedFiles.length) {
+        addNotification({
+          type: 'warning',
+          title: 'Some Files Skipped',
+          message: `${selectedFiles.length - pdfFiles.length} non-PDF file(s) were skipped.`
         });
       }
+
+      setFiles(pdfFiles);
     }
   };
 
@@ -40,40 +57,76 @@ const AdminSyllabus: React.FC = () => {
     const electiveId = uploadType === 'complete' ? 'COMPLETE_SYLLABUS' : selectedElective;
     const syllabusTitle = uploadType === 'complete' ? 'Complete Syllabus Document' : '';
 
-    if ((uploadType === 'elective' && !selectedElective) || !file) {
+    if ((uploadType === 'elective' && !selectedElective) || files.length === 0) {
       addNotification({
         type: 'error',
         title: 'Missing Information',
         message: uploadType === 'complete' 
-          ? 'Please select a PDF file.' 
-          : 'Please select an elective and a PDF file.'
+          ? 'Please select at least one PDF file.' 
+          : 'Please select an elective and at least one PDF file.'
       });
       return;
     }
 
     setUploading(true);
+    let successCount = 0;
+    let failCount = 0;
+
     try {
-      const success = await uploadSyllabus(electiveId, file, description || syllabusTitle);
-      if (success) {
+      // Upload each file separately
+      for (const file of files) {
+        try {
+          const success = await uploadSyllabus(
+            electiveId, 
+            file, 
+            description || syllabusTitle,
+            targetDepartment === 'all' ? undefined : targetDepartment,
+            targetSemester === 'all' ? undefined : parseInt(targetSemester)
+          );
+          
+          if (success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+          failCount++;
+        }
+      }
+
+      // Show summary notification
+      if (successCount > 0) {
         addNotification({
           type: 'success',
-          title: 'Syllabus Uploaded',
-          message: `The ${uploadType === 'complete' ? 'complete syllabus' : 'syllabus'} has been uploaded successfully.`
+          title: 'Upload Complete',
+          message: `Successfully uploaded ${successCount} file(s).${failCount > 0 ? ` ${failCount} file(s) failed.` : ''}`
         });
-        // Reset form
+      }
+
+      if (failCount > 0 && successCount === 0) {
+        addNotification({
+          type: 'error',
+          title: 'Upload Failed',
+          message: 'All file uploads failed. Please try again.'
+        });
+      }
+
+      // Reset form if at least one succeeded
+      if (successCount > 0) {
         setSelectedElective('');
         setDescription('');
-        setFile(null);
+        setFiles([]);
+        setTargetDepartment('all');
+        setTargetSemester('all');
         const fileInput = document.getElementById('syllabusFile') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
-      } else {
-        throw new Error('Upload failed');
       }
     } catch {
       addNotification({
         type: 'error',
         title: 'Upload Failed',
-        message: 'Failed to upload syllabus. Please try again.'
+        message: 'Failed to upload syllabus files. Please try again.'
       });
     } finally {
       setUploading(false);
@@ -177,20 +230,73 @@ const AdminSyllabus: React.FC = () => {
 
             <div className={uploadType === 'complete' ? 'md:col-span-2' : ''}>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                PDF File
+                PDF Files (Multiple files supported)
               </label>
               <input
                 id="syllabusFile"
                 type="file"
                 accept=".pdf"
+                multiple
                 onChange={handleFileChange}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
               />
-              {file && (
-                <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-                  Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                </p>
+              {files.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                    {files.length} file(s) selected:
+                  </p>
+                  {files.map((file, index) => (
+                    <p key={index} className="text-xs text-gray-600 dark:text-gray-400">
+                      • {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </p>
+                  ))}
+                </div>
               )}
+            </div>
+          </div>
+
+          {/* Target Department and Semester Selection */}
+          <div className="grid md:grid-cols-2 gap-6 mt-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Target Department (Optional)
+              </label>
+              <select
+                value={targetDepartment}
+                onChange={(e) => setTargetDepartment(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Departments</option>
+                {departments.map(dept => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Only students from selected department will see this syllabus
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Target Semester (Optional)
+              </label>
+              <select
+                value={targetSemester}
+                onChange={(e) => setTargetSemester(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Semesters</option>
+                {semesters.map(sem => (
+                  <option key={sem} value={sem}>
+                    Semester {sem}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Only students in selected semester will see this syllabus
+              </p>
             </div>
           </div>
 
@@ -210,12 +316,17 @@ const AdminSyllabus: React.FC = () => {
           <div className="mt-6">
             <button
               onClick={handleUpload}
-              disabled={uploading || (uploadType === 'elective' && !selectedElective) || !file}
+              disabled={uploading || (uploadType === 'elective' && !selectedElective) || files.length === 0}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md transition-colors flex items-center gap-2"
             >
               <Upload className="w-4 h-4" />
-              {uploading ? 'Uploading...' : `Upload ${uploadType === 'complete' ? 'Complete' : ''} Syllabus`}
+              {uploading ? `Uploading ${files.length} file(s)...` : `Upload ${files.length > 0 ? `${files.length} ` : ''}${uploadType === 'complete' ? 'Complete' : ''} Syllabus`}
             </button>
+            {files.length > 0 && !uploading && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Ready to upload {files.length} file(s){targetDepartment !== 'all' ? ` to ${targetDepartment}` : ''}{targetSemester !== 'all' ? `, Semester ${targetSemester}` : ''}
+              </p>
+            )}
           </div>
         </div>
 
@@ -261,10 +372,25 @@ const AdminSyllabus: React.FC = () => {
                             {syllabus.description}
                           </p>
                         )}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                           <span>Uploaded: {syllabus.uploadedAt.toLocaleDateString()}</span>
                           <span>Academic Year: {syllabus.academicYear}</span>
                           <span>Version: {syllabus.version}</span>
+                          {syllabus.targetDepartment && (
+                            <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded">
+                              📍 {syllabus.targetDepartment}
+                            </span>
+                          )}
+                          {syllabus.targetSemester && (
+                            <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded">
+                              📅 Sem {syllabus.targetSemester}
+                            </span>
+                          )}
+                          {!syllabus.targetDepartment && !syllabus.targetSemester && (
+                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
+                              🌐 All Students
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -334,10 +460,25 @@ const AdminSyllabus: React.FC = () => {
                             {syllabus.description}
                           </p>
                         )}
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                           <span>Uploaded: {syllabus.uploadedAt.toLocaleDateString()}</span>
                           <span>Academic Year: {syllabus.academicYear}</span>
                           <span>Version: {syllabus.version}</span>
+                          {syllabus.targetDepartment && (
+                            <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded">
+                              📍 {syllabus.targetDepartment}
+                            </span>
+                          )}
+                          {syllabus.targetSemester && (
+                            <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 rounded">
+                              📅 Sem {syllabus.targetSemester}
+                            </span>
+                          )}
+                          {!syllabus.targetDepartment && !syllabus.targetSemester && (
+                            <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
+                              🌐 All Students
+                            </span>
+                          )}
                         </div>
                       </div>
 

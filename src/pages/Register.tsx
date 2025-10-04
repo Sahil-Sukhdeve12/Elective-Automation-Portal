@@ -71,11 +71,11 @@ const Register: React.FC = () => {
       return false;
     }
 
-    if (!registrationNumber || registrationNumber.length < 5) {
+    if (!registrationNumber || registrationNumber.length < 1) {
       addNotification({
         type: 'error',
         title: 'Validation Error',
-        message: 'Please enter a valid class roll number (minimum 5 characters).'
+        message: 'Please enter a valid class roll number (minimum 1 character).'
       });
       return false;
     }

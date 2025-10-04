@@ -363,6 +363,8 @@ export interface Syllabus {
   semester: number;
   version: number;
   isActive: boolean;
+  targetDepartment?: string; // Optional: Show only to specific department
+  targetSemester?: number; // Optional: Show only to specific semester
 }
 
 interface DataContextType {
@@ -427,7 +429,7 @@ interface DataContextType {
   getStudentSubmittedTemplates: (studentId: string) => string[];
   deleteFeedbackResponse: (responseId: string) => void;
   // Syllabus management functions
-  uploadSyllabus: (electiveId: string, file: File, description: string) => Promise<boolean>;
+  uploadSyllabus: (electiveId: string, file: File, description: string, targetDepartment?: string, targetSemester?: number) => Promise<boolean>;
   getSyllabus: (electiveId: string) => Syllabus | null;
   getAllSyllabi: () => Syllabus[];
   updateSyllabus: (syllabusId: string, updates: Partial<Syllabus>) => Promise<boolean>;
@@ -1077,6 +1079,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (backendSelections.length > 0) {
         console.log('✅ Loaded student selections from backend:', backendSelections.length);
         setStudentElectives(backendSelections);
+        // Save to localStorage for persistence
+        localStorage.setItem('studentElectives', JSON.stringify(backendSelections));
+      } else {
+        // Fallback to localStorage if API fails or returns empty
+        const storedSelections = localStorage.getItem('studentElectives');
+        if (storedSelections) {
+          const parsedSelections = JSON.parse(storedSelections);
+          console.log('📦 Loaded student selections from localStorage:', parsedSelections.length);
+          setStudentElectives(parsedSelections);
+        }
       }
     };
 
@@ -1265,6 +1277,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Remove from student electives
       const updatedStudentElectives = studentElectives.filter(se => se.id !== studentElectiveId);
       setStudentElectives(updatedStudentElectives);
+      // Update localStorage
+      localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
+      console.log('✅ Selection removed from state and localStorage');
       return true;
     } catch (error) {
       console.error('Error removing elective:', error);
@@ -1290,6 +1305,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : se
       );
       setStudentElectives(updatedStudentElectives);
+      // Update localStorage
+      localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
+      console.log('✅ Feedback saved to state and localStorage');
       return true;
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -1372,6 +1390,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           const updatedStudentElectives = [...studentElectives, studentElective];
           setStudentElectives(updatedStudentElectives);
+          // Save to localStorage for persistence across page refreshes
+          localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
+          console.log('✅ Selection saved to state and localStorage');
         }
         
         // Refresh electives to get updated enrollment counts
@@ -2218,7 +2239,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Syllabus management functions
-  const uploadSyllabus = async (electiveId: string, file: File, description: string): Promise<boolean> => {
+  const uploadSyllabus = async (
+    electiveId: string, 
+    file: File, 
+    description: string,
+    targetDepartment?: string,
+    targetSemester?: number
+  ): Promise<boolean> => {
     try {
       // Convert PDF to base64
       const base64Data = await new Promise<string>((resolve, reject) => {
@@ -2242,9 +2269,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         pdfFileName: file.name,
         uploadedBy: 'admin', // In real app, get from auth context
         academicYear: '2024-25',
-        semester: new Date().getMonth() >= 6 ? 1 : 2, // Simple logic
+        semester: targetSemester || (new Date().getMonth() >= 6 ? 1 : 2),
         version: 1,
-        isActive: true
+        isActive: true,
+        targetDepartment, // Add department targeting
+        targetSemester // Add semester targeting
       };
 
       // Upload to MongoDB via API
@@ -2256,12 +2285,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         uploadedAt: new Date(uploadedSyllabus.uploadedAt)
       };
 
-      // Deactivate previous versions locally
-      const updatedSyllabi = syllabi.map(s => 
-        s.electiveId === electiveId ? { ...s, isActive: false } : s
-      );
-      
-      const finalSyllabi = [...updatedSyllabi, newSyllabus];
+      // Don't deactivate previous versions, allow multiple files
+      const finalSyllabi = [...syllabi, newSyllabus];
       setSyllabi(finalSyllabi);
       localStorage.setItem('syllabi', JSON.stringify(finalSyllabi));
       

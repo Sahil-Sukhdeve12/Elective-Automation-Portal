@@ -38,9 +38,10 @@ const StudentProgress: React.FC = () => {
     ? tracks.find(t => t.name === currentTrackName)
     : null;
 
-  // Get all semesters (1-8) for display
-  const allSemesters = Array.from({ length: 8 }, (_, i) => i + 1);
+  // Get current semester
   const currentSemester = user.semester || 1;
+  
+  const allSemesters = Array.from({ length: 8 }, (_, i) => i + 1);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

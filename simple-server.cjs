@@ -963,7 +963,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
     // Create new elective
     const newElective = new Elective({
       name,
-      code: code && code.trim() !== '' ? code.trim() : undefined, // Set to undefined if empty
+      code: code && code.trim() !== '' && code !== 'null' && code !== 'undefined' ? code.trim() : undefined, // Set to undefined if empty, null string, or undefined string
       semester: parseInt(semester),
       track,
       description,
@@ -1010,6 +1010,16 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       const field = Object.keys(error.keyPattern || {})[0] || 'field';
       const value = error.keyValue ? error.keyValue[field] : 'unknown';
       
+      // Special message for course code duplicates
+      if (field === 'code') {
+        return res.status(400).json({ 
+          success: false,
+          error: `Duplicate course code`,
+          message: `An elective with course code "${value}" already exists. Please use a different course code or leave it empty.`,
+          details: error.message 
+        });
+      }
+      
       return res.status(400).json({ 
         success: false,
         error: `Duplicate ${field}`,
@@ -1052,8 +1062,12 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
     const updateData = {};
     Object.keys(req.body).forEach(key => {
       if (req.body[key] !== undefined) {
+        // Special handling for code - empty/null string should clear it (set to undefined)
+        if (key === 'code' && (req.body[key] === '' || req.body[key] === 'null' || req.body[key] === 'undefined' || !req.body[key])) {
+          updateData[key] = undefined;
+        }
         // Special handling for deadline - empty string should clear it
-        if (key === 'deadline' && req.body[key] === '') {
+        else if (key === 'deadline' && req.body[key] === '') {
           updateData[key] = null;
         } else if (key === 'deadline' && req.body[key]) {
           updateData[key] = new Date(req.body[key]);

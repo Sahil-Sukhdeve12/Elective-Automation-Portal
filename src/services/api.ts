@@ -329,6 +329,8 @@ export interface SyllabusData {
   semester: number;
   version: number;
   isActive: boolean;
+  targetDepartment?: string; // Optional: Show only to specific department
+  targetSemester?: number; // Optional: Show only to specific semester
 }
 
 export const syllabusApi = {

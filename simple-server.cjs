@@ -220,10 +220,7 @@ const feedbackTemplateSchema = new mongoose.Schema({
     options: [String], // For multiple-choice questions
     required: { type: Boolean, default: false }
   }],
-  targetCategory: { 
-    type: String,
-    enum: ['Departmental', 'Open', 'Humanities']
-  },
+  targetCategory: String, // Accept any category from database (no enum restriction)
   targetDepartment: String,
   targetSemester: Number,
   targetSection: mongoose.Schema.Types.Mixed, // Can be string or array of strings
@@ -233,6 +230,11 @@ const feedbackTemplateSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Clear any existing model to avoid cached schema with old enum
+if (mongoose.models.FeedbackTemplate) {
+  delete mongoose.models.FeedbackTemplate;
+}
 
 const FeedbackTemplate = mongoose.model('FeedbackTemplate', feedbackTemplateSchema);
 
@@ -1562,7 +1564,7 @@ app.post('/api/feedback/templates', authenticateToken, async (req, res) => {
       isActive
     } = req.body;
 
-    console.log('📝 Creating feedback template:', { title, questionCount: questions?.length });
+    console.log('📝 Creating feedback template:', { title, questionCount: questions?.length, targetCategory });
 
     // Validate required fields
     if (!title || !questions || questions.length === 0) {
@@ -1572,18 +1574,31 @@ app.post('/api/feedback/templates', authenticateToken, async (req, res) => {
       });
     }
 
-    const newTemplate = new FeedbackTemplate({
+    // Build template object with only non-empty optional fields
+    const templateObj = {
       title,
       description,
       questions,
-      targetCategory,
-      targetDepartment,
-      targetSemester,
-      targetSection,
       isActive: isActive !== undefined ? isActive : true,
       createdBy: req.user.userId,
       createdAt: new Date()
-    });
+    };
+
+    // Only add targeting fields if they have values
+    if (targetCategory && targetCategory.trim()) {
+      templateObj.targetCategory = targetCategory;
+    }
+    if (targetDepartment && targetDepartment.trim()) {
+      templateObj.targetDepartment = targetDepartment;
+    }
+    if (targetSemester) {
+      templateObj.targetSemester = targetSemester;
+    }
+    if (targetSection) {
+      templateObj.targetSection = targetSection;
+    }
+
+    const newTemplate = new FeedbackTemplate(templateObj);
 
     const savedTemplate = await newTemplate.save();
     console.log('✅ Feedback template created successfully:', savedTemplate._id);

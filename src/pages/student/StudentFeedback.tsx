@@ -17,11 +17,28 @@ const StudentFeedback: React.FC = () => {
   const allTemplates = getActiveFeedbackTemplates();
   const submittedTemplates = getStudentSubmittedTemplates(user.id);
 
+  console.log('📝 All templates:', allTemplates);
+  console.log('👤 User info:', { 
+    department: user.department, 
+    semester: user.semester, 
+    section: user.section 
+  });
+
   // Filter templates based on student's department, semester, and section
   const feedbackTemplates = allTemplates.filter(template => {
+    console.log('🔍 Filtering template:', template.title, {
+      targetDepartment: template.targetDepartment,
+      targetSemester: template.targetSemester,
+      targetSection: template.targetSection,
+      targetCategory: template.targetCategory
+    });
+
     // If no target filters are set, show to everyone
     const hasNoFilters = !template.targetDepartment && !template.targetSemester && (!template.targetSection || (Array.isArray(template.targetSection) && template.targetSection.length === 0));
-    if (hasNoFilters) return true;
+    if (hasNoFilters) {
+      console.log('✅ No filters - showing to everyone');
+      return true;
+    }
 
     // Check department match
     const departmentMatch = !template.targetDepartment || template.targetDepartment === user.department;
@@ -41,9 +58,15 @@ const StudentFeedback: React.FC = () => {
       }
     }
 
+    console.log('🎯 Filter results:', { departmentMatch, semesterMatch, sectionMatch });
+
     // Template is visible if all specified filters match
-    return departmentMatch && semesterMatch && sectionMatch;
+    const shouldShow = departmentMatch && semesterMatch && sectionMatch;
+    console.log(shouldShow ? '✅ Template visible' : '❌ Template hidden');
+    return shouldShow;
   });
+
+  console.log('📋 Filtered templates:', feedbackTemplates.length, 'out of', allTemplates.length);
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
@@ -57,7 +80,7 @@ const StudentFeedback: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const template = feedbackTemplates.find(t => t.id === selectedTemplate);
     if (!template) return;
@@ -75,32 +98,41 @@ const StudentFeedback: React.FC = () => {
       return;
     }
 
-    // Submit feedback response
-    const responseData = {
-      templateId: selectedTemplate,
-      templateTitle: template.title,
-      studentId: user.id,
-      studentName: user.name,
-      studentDepartment: user.department,
-      studentSemester: user.semester,
-      studentSection: user.section,
-      responses: template.questions.map(q => ({
-        questionId: q.id,
-        question: q.question,
-        answer: responses[q.id] || '',
-        questionType: q.type
-      }))
-    };
+    try {
+      // Submit feedback response
+      const responseData = {
+        templateId: selectedTemplate,
+        templateTitle: template.title,
+        studentId: user.id,
+        studentName: user.name,
+        studentDepartment: user.department,
+        studentSemester: user.semester,
+        studentSection: user.section,
+        responses: template.questions.map(q => ({
+          questionId: q.id,
+          question: q.question,
+          answer: responses[q.id] || '',
+          questionType: q.type
+        }))
+      };
 
-    submitFeedbackResponse(responseData);
-    setSelectedTemplate('');
-    setResponses({});
-    
-    addNotification({
-      type: 'success',
-      title: 'Feedback Submitted',
-      message: 'Thank you for your feedback! Your responses have been recorded.'
-    });
+      await submitFeedbackResponse(responseData);
+      setSelectedTemplate('');
+      setResponses({});
+      
+      addNotification({
+        type: 'success',
+        title: 'Feedback Submitted',
+        message: 'Thank you for your feedback! Your responses have been recorded.'
+      });
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      addNotification({
+        type: 'error',
+        title: 'Submission Failed',
+        message: error instanceof Error ? error.message : 'Failed to submit feedback. Please try again.'
+      });
+    }
   };
 
   const renderQuestion = (question: FeedbackQuestion) => {

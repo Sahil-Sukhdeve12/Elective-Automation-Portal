@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Plus, FileText, Eye, Trash2, CheckCircle } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AdminFeedback: React.FC = () => {
+  const { user } = useAuth();
   const { 
     getActiveFeedbackTemplates,
     deleteFeedbackTemplate, 
@@ -11,8 +13,14 @@ const AdminFeedback: React.FC = () => {
     getAvailableDepartments,
     getAvailableSemesters,
     getAvailableSections,
+    getAvailableCategories,
     electives
   } = useData();
+  
+  // Get all categories directly from database (no filtering)
+  const categoryOptions = getAvailableCategories();
+  
+  console.log('🔍 Categories from MongoDB:', categoryOptions);
   
   // Get all templates and responses
   const feedbackTemplates = getActiveFeedbackTemplates();
@@ -43,9 +51,6 @@ const AdminFeedback: React.FC = () => {
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
-  // Get unique categories from electives
-  const availableCategories = Array.from(new Set(electives.flatMap(e => e.category || [])));
-  
   // Get elective names based on selected category
   const getElectivesByCategory = () => {
     if (!newTemplate.targetCategory) return [];
@@ -118,30 +123,59 @@ const AdminFeedback: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newTemplate.title.trim() && newTemplate.questions.every(q => q.question.trim())) {
-      // Add IDs to questions if they don't have them
-      const questionsWithIds = newTemplate.questions.map(q => ({
-        ...q,
-        id: q.id || `q_${Date.now()}_${Math.random()}`
-      }));
+      try {
+        // Add IDs to questions if they don't have them
+        const questionsWithIds = newTemplate.questions.map(q => ({
+          ...q,
+          id: q.id || `q_${Date.now()}_${Math.random()}`
+        }));
 
-      createFeedbackTemplate({
-        ...newTemplate,
-        questions: questionsWithIds
-      });
-      
-      setNewTemplate({
-        title: '',
-        description: '',
-        targetCategory: 'Departmental',
-        targetElectiveName: '', // Reset elective name
-        targetDepartment: '',
-        targetSemester: undefined,
-        targetSection: [],
-        isActive: true,
-        createdBy: 'admin',
-        questions: [{ id: '', question: '', type: 'text', options: [], required: true }]
-      });
-      setShowAddForm(false);
+        // Only send fields that match the backend schema
+        const templateData: any = {
+          title: newTemplate.title,
+          description: newTemplate.description,
+          questions: questionsWithIds,
+          isActive: newTemplate.isActive,
+          createdBy: user?.email || user?.name || 'admin'
+        };
+
+        // Only add optional fields if they have values
+        if (newTemplate.targetCategory && newTemplate.targetCategory.trim()) {
+          templateData.targetCategory = newTemplate.targetCategory;
+        }
+        if (newTemplate.targetDepartment && newTemplate.targetDepartment.trim()) {
+          templateData.targetDepartment = newTemplate.targetDepartment;
+        }
+        if (newTemplate.targetSemester) {
+          templateData.targetSemester = newTemplate.targetSemester;
+        }
+        if (newTemplate.targetSection && newTemplate.targetSection.length > 0) {
+          templateData.targetSection = newTemplate.targetSection;
+        }
+
+        console.log('📝 Sending template data:', templateData);
+        console.log('📝 Full newTemplate state:', newTemplate);
+
+        await createFeedbackTemplate(templateData);
+        
+        setNewTemplate({
+          title: '',
+          description: '',
+          targetCategory: 'Departmental',
+          targetElectiveName: '', // Reset elective name
+          targetDepartment: '',
+          targetSemester: undefined,
+          targetSection: [],
+          isActive: true,
+          createdBy: 'admin',
+          questions: [{ id: '', question: '', type: 'text', options: [], required: true }]
+        });
+        setShowAddForm(false);
+        alert('Feedback template created successfully!');
+      } catch (error) {
+        console.error('Error in handleSubmit:', error);
+        alert(`Failed to create feedback template: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   };
 
@@ -252,22 +286,14 @@ const AdminFeedback: React.FC = () => {
                          focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select Category</option>
-                {availableCategories.length > 0 ? (
-                  availableCategories.map(category => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))
-                ) : (
-                  <>
-                    <option value="Departmental">Departmental</option>
-                    <option value="Open">Open</option>
-                    <option value="Humanities">Humanities</option>
-                  </>
-                )}
+                {categoryOptions.map(category => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
               </select>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Categories are loaded from electives in the database
+                Categories from database (only valid feedback categories shown)
               </p>
             </div>
 

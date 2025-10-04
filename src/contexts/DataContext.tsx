@@ -1816,7 +1816,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Category management functions
   const getAvailableCategories = (): string[] => {
-    return adminCategories;
+    // Extract unique categories from electives
+    const categories = new Set<string>();
+    electives.forEach(elective => {
+      if (Array.isArray(elective.category)) {
+        elective.category.forEach(cat => categories.add(cat));
+      } else if (elective.category) {
+        categories.add(elective.category);
+      }
+    });
+    return Array.from(categories);
   };
 
   const addCategory = async (category: string): Promise<boolean> => {
@@ -2205,7 +2214,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const createFeedbackTemplate = async (template: Omit<FeedbackTemplate, 'id' | 'createdAt'>): Promise<void> => {
     try {
       const token = localStorage.getItem('authToken');
-      console.log('Creating feedback template in database...');
+      console.log('Creating feedback template in database...', template);
       
       const response = await fetch(`${getApiBaseUrl()}/feedback/templates`, {
         method: 'POST',
@@ -2217,6 +2226,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       const data = await response.json();
+      console.log('Response from server:', data);
+      console.log('Response status:', response.status);
+      console.log('Response OK:', response.ok);
+      
+      if (!response.ok) {
+        const errorMsg = `${data.error || 'Server error'}\nDetails: ${data.details || 'No details'}\nStatus: ${response.status}`;
+        console.error('❌ Server error:', errorMsg);
+        throw new Error(errorMsg);
+      }
       
       if (data.success && data.template) {
         const newTemplate: FeedbackTemplate = {
@@ -2230,19 +2248,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
         console.log('✅ Feedback template created successfully:', newTemplate.id);
       } else {
-        console.error('Failed to create feedback template:', data.message);
+        throw new Error(data.message || data.error || 'Failed to create feedback template');
       }
     } catch (error) {
-      console.error('Error creating feedback template:', error);
-      // Fallback to localStorage only
-      const newTemplate: FeedbackTemplate = {
-        ...template,
-        id: Date.now().toString(),
-        createdAt: new Date()
-      };
-      const updatedTemplates = [...feedbackTemplates, newTemplate];
-      setFeedbackTemplates(updatedTemplates);
-      localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+      console.error('Failed to create feedback template:', error);
+      throw error; // Re-throw to let caller handle it
     }
   };
 

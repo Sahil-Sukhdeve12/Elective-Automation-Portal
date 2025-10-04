@@ -152,6 +152,39 @@ const fetchSyllabi = async () => {
   }
 };
 
+// API function to fetch feedback templates
+const fetchFeedbackTemplates = async () => {
+  try {
+    console.log('Fetching feedback templates from API...');
+    const response = await fetch(`${getApiBaseUrl()}/feedback/templates`);
+    
+    if (!response.ok) {
+      console.error('Fetch feedback templates failed with status:', response.status);
+      return [];
+    }
+    
+    const data = await response.json();
+    console.log('Raw feedback templates from API:', data);
+    
+    if (data.success && data.templates) {
+      // Map MongoDB _id to id and parse dates
+      const templates = data.templates.map((template: any) => ({
+        ...template,
+        id: template._id || template.id,
+        createdAt: new Date(template.createdAt)
+      }));
+      
+      console.log('✅ Feedback templates fetched successfully:', templates.length);
+      return templates;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error fetching feedback templates:', error);
+    return [];
+  }
+};
+
 // API function to fetch student elective selections
 const fetchStudentSelections = async () => {
   try {
@@ -419,12 +452,12 @@ interface DataContextType {
   getActiveAlerts: (department?: string, semester?: number) => AlertNotification[];
   deleteAlert: (alertId: string) => void;
   // Feedback template functions
-  createFeedbackTemplate: (template: Omit<FeedbackTemplate, 'id' | 'createdAt'>) => void;
-  updateFeedbackTemplate: (templateId: string, updates: Partial<FeedbackTemplate>) => void;
-  deleteFeedbackTemplate: (templateId: string) => void;
+  createFeedbackTemplate: (template: Omit<FeedbackTemplate, 'id' | 'createdAt'>) => Promise<void>;
+  updateFeedbackTemplate: (templateId: string, updates: Partial<FeedbackTemplate>) => Promise<void>;
+  deleteFeedbackTemplate: (templateId: string) => Promise<void>;
   getActiveFeedbackTemplates: (category?: string) => FeedbackTemplate[];
   // Feedback response functions
-  submitFeedbackResponse: (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>) => void;
+  submitFeedbackResponse: (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>) => Promise<void>;
   getFeedbackResponses: (templateId?: string, studentId?: string) => FeedbackResponse[];
   getStudentSubmittedTemplates: (studentId: string) => string[];
   deleteFeedbackResponse: (responseId: string) => void;
@@ -1088,6 +1121,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const parsedSelections = JSON.parse(storedSelections);
           console.log('📦 Loaded student selections from localStorage:', parsedSelections.length);
           setStudentElectives(parsedSelections);
+        }
+      }
+
+      // Fetch feedback templates from backend
+      const backendTemplates = await fetchFeedbackTemplates();
+      if (backendTemplates.length > 0) {
+        console.log('✅ Loaded feedback templates from backend:', backendTemplates.length);
+        setFeedbackTemplates(backendTemplates);
+        localStorage.setItem('feedbackTemplates', JSON.stringify(backendTemplates));
+      } else {
+        // Fallback to localStorage if API fails
+        const storedTemplates = localStorage.getItem('feedbackTemplates');
+        if (storedTemplates) {
+          const parsedTemplates = JSON.parse(storedTemplates).map((template: FeedbackTemplate) => ({
+            ...template,
+            createdAt: new Date(template.createdAt)
+          }));
+          console.log('📦 Loaded feedback templates from localStorage:', parsedTemplates.length);
+          setFeedbackTemplates(parsedTemplates);
         }
       }
     };
@@ -2150,30 +2202,122 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Feedback template functions
-  const createFeedbackTemplate = (template: Omit<FeedbackTemplate, 'id' | 'createdAt'>): void => {
-    const newTemplate: FeedbackTemplate = {
-      ...template,
-      id: Date.now().toString(),
-      createdAt: new Date()
-    };
-    
-    const updatedTemplates = [...feedbackTemplates, newTemplate];
-    setFeedbackTemplates(updatedTemplates);
-    localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+  const createFeedbackTemplate = async (template: Omit<FeedbackTemplate, 'id' | 'createdAt'>): Promise<void> => {
+    try {
+      const token = localStorage.getItem('authToken');
+      console.log('Creating feedback template in database...');
+      
+      const response = await fetch(`${getApiBaseUrl()}/feedback/templates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(template)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.template) {
+        const newTemplate: FeedbackTemplate = {
+          ...data.template,
+          id: data.template._id || data.template.id,
+          createdAt: new Date(data.template.createdAt)
+        };
+        
+        const updatedTemplates = [...feedbackTemplates, newTemplate];
+        setFeedbackTemplates(updatedTemplates);
+        localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+        console.log('✅ Feedback template created successfully:', newTemplate.id);
+      } else {
+        console.error('Failed to create feedback template:', data.message);
+      }
+    } catch (error) {
+      console.error('Error creating feedback template:', error);
+      // Fallback to localStorage only
+      const newTemplate: FeedbackTemplate = {
+        ...template,
+        id: Date.now().toString(),
+        createdAt: new Date()
+      };
+      const updatedTemplates = [...feedbackTemplates, newTemplate];
+      setFeedbackTemplates(updatedTemplates);
+      localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+    }
   };
 
-  const updateFeedbackTemplate = (templateId: string, updates: Partial<FeedbackTemplate>): void => {
-    const updatedTemplates = feedbackTemplates.map(template =>
-      template.id === templateId ? { ...template, ...updates } : template
-    );
-    setFeedbackTemplates(updatedTemplates);
-    localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+  const updateFeedbackTemplate = async (templateId: string, updates: Partial<FeedbackTemplate>): Promise<void> => {
+    try {
+      const token = localStorage.getItem('authToken');
+      console.log('Updating feedback template in database:', templateId);
+      
+      const response = await fetch(`${getApiBaseUrl()}/feedback/templates/${templateId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.template) {
+        const updatedTemplate: FeedbackTemplate = {
+          ...data.template,
+          id: data.template._id || data.template.id,
+          createdAt: new Date(data.template.createdAt)
+        };
+        
+        const updatedTemplates = feedbackTemplates.map(template =>
+          template.id === templateId ? updatedTemplate : template
+        );
+        setFeedbackTemplates(updatedTemplates);
+        localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+        console.log('✅ Feedback template updated successfully:', templateId);
+      } else {
+        console.error('Failed to update feedback template:', data.message);
+      }
+    } catch (error) {
+      console.error('Error updating feedback template:', error);
+      // Fallback to localStorage only
+      const updatedTemplates = feedbackTemplates.map(template =>
+        template.id === templateId ? { ...template, ...updates } : template
+      );
+      setFeedbackTemplates(updatedTemplates);
+      localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+    }
   };
 
-  const deleteFeedbackTemplate = (templateId: string): void => {
-    const updatedTemplates = feedbackTemplates.filter(template => template.id !== templateId);
-    setFeedbackTemplates(updatedTemplates);
-    localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+  const deleteFeedbackTemplate = async (templateId: string): Promise<void> => {
+    try {
+      const token = localStorage.getItem('authToken');
+      console.log('Deleting feedback template from database:', templateId);
+      
+      const response = await fetch(`${getApiBaseUrl()}/feedback/templates/${templateId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const updatedTemplates = feedbackTemplates.filter(template => template.id !== templateId);
+        setFeedbackTemplates(updatedTemplates);
+        localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+        console.log('✅ Feedback template deleted successfully:', templateId);
+      } else {
+        console.error('Failed to delete feedback template:', data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting feedback template:', error);
+      // Fallback to localStorage only
+      const updatedTemplates = feedbackTemplates.filter(template => template.id !== templateId);
+      setFeedbackTemplates(updatedTemplates);
+      localStorage.setItem('feedbackTemplates', JSON.stringify(updatedTemplates));
+    }
   };
 
   const getActiveFeedbackTemplates = (category?: string): FeedbackTemplate[] => {
@@ -2187,16 +2331,57 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Feedback response functions
-  const submitFeedbackResponse = (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>): void => {
-    const newResponse: FeedbackResponse = {
-      ...response,
-      id: Date.now().toString(),
-      submittedAt: new Date()
-    };
-    
-    const updatedResponses = [...feedbackResponses, newResponse];
-    setFeedbackResponses(updatedResponses);
-    localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+  const submitFeedbackResponse = async (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>): Promise<void> => {
+    try {
+      const token = localStorage.getItem('authToken');
+      console.log('Submitting feedback response to database...');
+      
+      const submitResponse = await fetch(`${getApiBaseUrl()}/feedback/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(response)
+      });
+      
+      const data = await submitResponse.json();
+      
+      if (data.success && data.response) {
+        const newResponse: FeedbackResponse = {
+          ...data.response,
+          id: data.response._id || data.response.id,
+          submittedAt: new Date(data.response.submittedAt)
+        };
+        
+        const updatedResponses = [...feedbackResponses, newResponse];
+        setFeedbackResponses(updatedResponses);
+        localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+        console.log('✅ Feedback response submitted successfully:', newResponse.id);
+      } else {
+        console.error('Failed to submit feedback response:', data.message);
+        // Still save locally even if API fails
+        const newResponse: FeedbackResponse = {
+          ...response,
+          id: Date.now().toString(),
+          submittedAt: new Date()
+        };
+        const updatedResponses = [...feedbackResponses, newResponse];
+        setFeedbackResponses(updatedResponses);
+        localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+      }
+    } catch (error) {
+      console.error('Error submitting feedback response:', error);
+      // Fallback to localStorage only
+      const newResponse: FeedbackResponse = {
+        ...response,
+        id: Date.now().toString(),
+        submittedAt: new Date()
+      };
+      const updatedResponses = [...feedbackResponses, newResponse];
+      setFeedbackResponses(updatedResponses);
+      localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+    }
   };
 
   const getFeedbackResponses = (templateId?: string, studentId?: string): FeedbackResponse[] => {

@@ -205,6 +205,63 @@ passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
 
 const PasswordResetToken = mongoose.model('PasswordResetToken', passwordResetTokenSchema);
 
+// Feedback Template Schema
+const feedbackTemplateSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: String,
+  questions: [{
+    id: String,
+    question: { type: String, required: true },
+    type: { 
+      type: String, 
+      enum: ['multiple-choice', 'rating', 'text', 'yes-no'],
+      required: true 
+    },
+    options: [String], // For multiple-choice questions
+    required: { type: Boolean, default: false }
+  }],
+  targetCategory: { 
+    type: String,
+    enum: ['Departmental', 'Open', 'Humanities']
+  },
+  targetDepartment: String,
+  targetSemester: Number,
+  targetSection: mongoose.Schema.Types.Mixed, // Can be string or array of strings
+  isActive: { type: Boolean, default: true },
+  createdBy: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+}, {
+  timestamps: true
+});
+
+const FeedbackTemplate = mongoose.model('FeedbackTemplate', feedbackTemplateSchema);
+
+// Feedback Response Schema
+const feedbackResponseSchema = new mongoose.Schema({
+  templateId: { type: mongoose.Schema.Types.ObjectId, ref: 'FeedbackTemplate', required: true },
+  templateTitle: String,
+  studentId: { type: String, required: true, index: true },
+  studentName: String,
+  studentDepartment: String,
+  studentSemester: Number,
+  studentSection: String,
+  responses: [{
+    questionId: String,
+    question: String,
+    answer: mongoose.Schema.Types.Mixed,
+    questionType: String
+  }],
+  submittedAt: { type: Date, default: Date.now },
+  electiveId: String // If feedback is specific to an elective
+}, {
+  timestamps: true
+});
+
+// Index to prevent duplicate responses
+feedbackResponseSchema.index({ templateId: 1, studentId: 1 }, { unique: true });
+
+const FeedbackResponse = mongoose.model('FeedbackResponse', feedbackResponseSchema);
+
 // Email Configuration
 const createEmailTransporter = () => {
   // Check if email is configured
@@ -931,6 +988,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
     console.log('📋 Category value:', req.body.category);
     console.log('📋 ElectiveCategory value:', req.body.electiveCategory);
     console.log('📋 SubjectType value:', req.body.subjectType);
+    console.log('📋 Course code value:', JSON.stringify(req.body.code));
     
     const {
       name,
@@ -960,10 +1018,22 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       deadline: deadline || selectionDeadline
     });
 
+    // Sanitize course code - convert null, "null", "undefined", empty string to undefined
+    let sanitizedCode = undefined;
+    if (code) {
+      const trimmedCode = String(code).trim();
+      // Only set code if it's not empty and not the string "null" or "undefined"
+      if (trimmedCode !== '' && trimmedCode !== 'null' && trimmedCode !== 'undefined' && trimmedCode !== 'NULL') {
+        sanitizedCode = trimmedCode;
+      }
+    }
+    
+    console.log('📋 Sanitized course code:', sanitizedCode === undefined ? 'undefined (will not be saved)' : sanitizedCode);
+
     // Create new elective
     const newElective = new Elective({
       name,
-      code: code && code.trim() !== '' && code !== 'null' && code !== 'undefined' ? code.trim() : undefined, // Set to undefined if empty, null string, or undefined string
+      code: sanitizedCode, // Use sanitized code
       semester: parseInt(semester),
       track,
       description,
@@ -1439,6 +1509,297 @@ app.delete('/api/tracks/:id', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to delete track',
+      details: error.message
+    });
+  }
+});
+
+// ========================================
+// FEEDBACK TEMPLATE ENDPOINTS
+// ========================================
+
+// Get all feedback templates
+app.get('/api/feedback/templates', async (req, res) => {
+  try {
+    const templates = await FeedbackTemplate.find().sort({ createdAt: -1 });
+    console.log(`✅ Retrieved ${templates.length} feedback templates`);
+    
+    res.json({
+      success: true,
+      templates: templates.map(template => ({
+        ...template.toObject(),
+        id: template._id
+      }))
+    });
+  } catch (error) {
+    console.error('❌ Error fetching feedback templates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch feedback templates',
+      details: error.message
+    });
+  }
+});
+
+// Create feedback template (Admin only)
+app.post('/api/feedback/templates', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    const {
+      title,
+      description,
+      questions,
+      targetCategory,
+      targetDepartment,
+      targetSemester,
+      targetSection,
+      isActive
+    } = req.body;
+
+    console.log('📝 Creating feedback template:', { title, questionCount: questions?.length });
+
+    // Validate required fields
+    if (!title || !questions || questions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title and at least one question are required'
+      });
+    }
+
+    const newTemplate = new FeedbackTemplate({
+      title,
+      description,
+      questions,
+      targetCategory,
+      targetDepartment,
+      targetSemester,
+      targetSection,
+      isActive: isActive !== undefined ? isActive : true,
+      createdBy: req.user.userId,
+      createdAt: new Date()
+    });
+
+    const savedTemplate = await newTemplate.save();
+    console.log('✅ Feedback template created successfully:', savedTemplate._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Feedback template created successfully',
+      template: {
+        ...savedTemplate.toObject(),
+        id: savedTemplate._id
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error creating feedback template:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create feedback template',
+      details: error.message
+    });
+  }
+});
+
+// Update feedback template (Admin only)
+app.put('/api/feedback/templates/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    const templateId = req.params.id;
+    const updates = req.body;
+
+    console.log('🔄 Updating feedback template:', templateId);
+
+    const template = await FeedbackTemplate.findByIdAndUpdate(
+      templateId,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Feedback template not found'
+      });
+    }
+
+    console.log('✅ Feedback template updated successfully');
+
+    res.json({
+      success: true,
+      message: 'Feedback template updated successfully',
+      template: {
+        ...template.toObject(),
+        id: template._id
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error updating feedback template:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update feedback template',
+      details: error.message
+    });
+  }
+});
+
+// Delete feedback template (Admin only)
+app.delete('/api/feedback/templates/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    const templateId = req.params.id;
+    console.log('🗑️ Deleting feedback template:', templateId);
+
+    const template = await FeedbackTemplate.findByIdAndDelete(templateId);
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Feedback template not found'
+      });
+    }
+
+    console.log('✅ Feedback template deleted successfully');
+
+    res.json({
+      success: true,
+      message: 'Feedback template deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error deleting feedback template:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete feedback template',
+      details: error.message
+    });
+  }
+});
+
+// Get feedback responses (Admin only)
+app.get('/api/feedback/responses', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    const { templateId } = req.query;
+    
+    const query = templateId ? { templateId } : {};
+    const responses = await FeedbackResponse.find(query).sort({ submittedAt: -1 });
+    
+    console.log(`✅ Retrieved ${responses.length} feedback responses`);
+
+    res.json({
+      success: true,
+      responses: responses.map(response => ({
+        ...response.toObject(),
+        id: response._id
+      }))
+    });
+  } catch (error) {
+    console.error('❌ Error fetching feedback responses:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch feedback responses',
+      details: error.message
+    });
+  }
+});
+
+// Submit feedback response (Student)
+app.post('/api/feedback/responses', authenticateToken, async (req, res) => {
+  try {
+    const {
+      templateId,
+      templateTitle,
+      responses,
+      electiveId
+    } = req.body;
+
+    const userId = req.user.userId;
+    
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    console.log('📝 Submitting feedback response:', { templateId, userId: user._id });
+
+    // Check if user already submitted this feedback
+    const existing = await FeedbackResponse.findOne({
+      templateId,
+      studentId: userId
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already submitted feedback for this template'
+      });
+    }
+
+    const newResponse = new FeedbackResponse({
+      templateId,
+      templateTitle,
+      studentId: userId,
+      studentName: user.name,
+      studentDepartment: user.department,
+      studentSemester: user.semester,
+      studentSection: user.section,
+      responses,
+      electiveId,
+      submittedAt: new Date()
+    });
+
+    const savedResponse = await newResponse.save();
+    console.log('✅ Feedback response submitted successfully:', savedResponse._id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Feedback submitted successfully',
+      response: {
+        ...savedResponse.toObject(),
+        id: savedResponse._id
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error submitting feedback response:', error);
+    
+    // Handle duplicate submission error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have already submitted feedback for this template'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to submit feedback',
       details: error.message
     });
   }

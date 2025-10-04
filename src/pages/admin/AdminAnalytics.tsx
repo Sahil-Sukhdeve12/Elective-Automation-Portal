@@ -1,15 +1,63 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useData, Student } from '../../contexts/DataContext';
-import { BarChart3, Users, BookOpen, Award, Target, Download } from 'lucide-react';
+import { BarChart3, Users, BookOpen, Award, Target, Download, Filter } from 'lucide-react';
 
 const AdminAnalytics: React.FC = () => {
-  const { electives, studentElectives, students } = useData();
+  const { electives, studentElectives, students, getAvailableDepartments, getAvailableSemesters, getAvailableSections, tracks } = useData();
+  
+  // Filter states
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedSemester, setSelectedSemester] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedTrack, setSelectedTrack] = useState('');
+
+  // Get filter options
+  const departments = getAvailableDepartments();
+  const semesters = getAvailableSemesters();
+  const sections = getAvailableSections();
+
+  // Apply filters
+  const filteredStudents = useMemo(() => {
+    return students.filter((student: Student) => {
+      if (selectedDepartment && student.department !== selectedDepartment) return false;
+      if (selectedSemester && student.semester !== parseInt(selectedSemester)) return false;
+      if (selectedSection && student.section !== selectedSection) return false;
+      return true;
+    });
+  }, [students, selectedDepartment, selectedSemester, selectedSection]);
+
+  const filteredElectives = useMemo(() => {
+    return electives.filter(elective => {
+      if (selectedDepartment && elective.department !== selectedDepartment) return false;
+      if (selectedSemester && elective.semester !== parseInt(selectedSemester)) return false;
+      if (selectedTrack && elective.track !== selectedTrack) return false;
+      return true;
+    });
+  }, [electives, selectedDepartment, selectedSemester, selectedTrack]);
+
+  const filteredStudentElectives = useMemo(() => {
+    const studentIds = new Set(filteredStudents.map(s => s.id));
+    const electiveIds = new Set(filteredElectives.map(e => e.id));
+    
+    return studentElectives.filter(se => {
+      if (!studentIds.has(se.studentId)) return false;
+      if (!electiveIds.has(se.electiveId)) return false;
+      if (selectedSemester && se.semester !== parseInt(selectedSemester)) return false;
+      if (selectedTrack && se.track !== selectedTrack) return false;
+      return true;
+    });
+  }, [studentElectives, filteredStudents, filteredElectives, selectedSemester, selectedTrack]);
 
   const analytics = useMemo(() => {
+    // Use filtered data instead of all data
+    const dataStudents = filteredStudents;
+    const dataElectives = filteredElectives;
+    const dataStudentElectives = filteredStudentElectives;
+    
     // Semester analytics
     const semesterStats = [5, 6, 7, 8].map(semester => {
-      const semesterSelections = studentElectives.filter(se => se.semester === semester);
-      const semesterElectives = electives.filter(e => e.semester === semester);
+      const semesterSelections = dataStudentElectives.filter(se => se.semester === semester);
+      const semesterElectives = dataElectives.filter(e => e.semester === semester);
       const utilizationRate = semesterElectives.length > 0 
         ? (semesterSelections.length / semesterElectives.length) * 100 
         : 0;
@@ -23,38 +71,46 @@ const AdminAnalytics: React.FC = () => {
     });
 
     // Popular electives
-    const electivePopularity = electives.map(elective => {
-      const selections = studentElectives.filter(se => se.electiveId === elective.id).length;
+    const electivePopularity = dataElectives.map(elective => {
+      const selections = dataStudentElectives.filter(se => se.electiveId === elective.id).length;
       return { ...elective, selections };
     }).sort((a, b) => b.selections - a.selections);
 
     // Student engagement
-    const studentEngagement = students.map((student: Student) => {
-      const studentElectivesData = studentElectives.filter(se => se.studentId === student.id);
+    const studentEngagement = dataStudents.map((student: Student) => {
+      const studentElectivesData = dataStudentElectives.filter(se => se.studentId === student.id);
       return {
         ...student,
         totalElectives: studentElectivesData.length
       };
     });
 
-    const avgElectivesPerStudent = studentEngagement.reduce((sum, s) => sum + s.totalElectives, 0) / students.length;
+    const avgElectivesPerStudent = studentEngagement.length > 0
+      ? studentEngagement.reduce((sum, s) => sum + s.totalElectives, 0) / studentEngagement.length
+      : 0;
 
     return {
       semesterStats,
       electivePopularity,
       studentEngagement,
       avgElectivesPerStudent: avgElectivesPerStudent || 0,
-      totalSelections: studentElectives.length,
-      activeStudents: new Set(studentElectives.map(se => se.studentId)).size
+      totalSelections: dataStudentElectives.length,
+      activeStudents: new Set(dataStudentElectives.map(se => se.studentId)).size
     };
-  }, [electives, studentElectives, students]);
+  }, [filteredElectives, filteredStudentElectives, filteredStudents]);
 
   const handleExportAnalytics = () => {
     const reportData = {
       generatedAt: new Date().toISOString(),
+      filters: {
+        department: selectedDepartment || 'All',
+        semester: selectedSemester || 'All',
+        section: selectedSection || 'All',
+        track: selectedTrack || 'All'
+      },
       overview: {
-        totalStudents: students.length,
-        totalElectives: electives.length,
+        totalStudents: filteredStudents.length,
+        totalElectives: filteredElectives.length,
         totalSelections: analytics.totalSelections,
         activeStudents: analytics.activeStudents
       },
@@ -73,8 +129,132 @@ const AdminAnalytics: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleClearFilters = () => {
+    setSelectedDepartment('');
+    setSelectedSemester('');
+    setSelectedSection('');
+    setSelectedTrack('');
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Filters Section */}
+      <div className="mb-6 bg-white p-6 rounded-lg shadow-sm border">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+            Filter Analytics
+          </h2>
+          <button
+            onClick={handleClearFilters}
+            className="text-sm text-gray-600 hover:text-gray-900 underline"
+          >
+            Clear All Filters
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Department Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Department
+            </label>
+            <select
+              value={selectedDepartment}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Departments</option>
+              {departments.map(dept => (
+                <option key={dept} value={dept}>{dept}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Semester Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Semester
+            </label>
+            <select
+              value={selectedSemester}
+              onChange={(e) => setSelectedSemester(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Semesters</option>
+              {semesters.map(sem => (
+                <option key={sem} value={sem}>{sem}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Section Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Section
+            </label>
+            <select
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Sections</option>
+              {sections.map(sec => (
+                <option key={sec} value={sec}>{sec}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Track Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Track
+            </label>
+            <select
+              value={selectedTrack}
+              onChange={(e) => setSelectedTrack(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Tracks</option>
+              {tracks.map(track => (
+                <option key={track.id} value={track.name}>{track.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Active Filters Display */}
+        {(selectedDepartment || selectedSemester || selectedSection || selectedTrack) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="text-sm text-gray-600">Active filters:</span>
+            {selectedDepartment && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+                Dept: {selectedDepartment}
+                <button onClick={() => setSelectedDepartment('')} className="ml-2 hover:text-blue-900">×</button>
+              </span>
+            )}
+            {selectedSemester && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                Sem: {selectedSemester}
+                <button onClick={() => setSelectedSemester('')} className="ml-2 hover:text-green-900">×</button>
+              </span>
+            )}
+            {selectedSection && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
+                Sec: {selectedSection}
+                <button onClick={() => setSelectedSection('')} className="ml-2 hover:text-purple-900">×</button>
+              </span>
+            )}
+            {selectedTrack && (
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800">
+                Track: {selectedTrack}
+                <button onClick={() => setSelectedTrack('')} className="ml-2 hover:text-orange-900">×</button>
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
@@ -97,9 +277,20 @@ const AdminAnalytics: React.FC = () => {
           <div className="flex items-center">
             <Users className="w-8 h-8 text-blue-600" />
             <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">{students.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{filteredStudents.length}</p>
               <p className="text-gray-600">Total Students</p>
               <p className="text-xs text-gray-500">{analytics.activeStudents} active</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center">
+            <BookOpen className="w-8 h-8 text-orange-600" />
+            <div className="ml-4">
+              <p className="text-2xl font-bold text-gray-900">{filteredElectives.length}</p>
+              <p className="text-gray-600">Available Electives</p>
+              <p className="text-xs text-gray-500">across all semesters</p>
             </div>
           </div>
         </div>

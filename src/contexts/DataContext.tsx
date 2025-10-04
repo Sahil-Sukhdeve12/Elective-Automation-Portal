@@ -190,10 +190,11 @@ const fetchStudentSelections = async () => {
   try {
     const authToken = localStorage.getItem('authToken');
     if (!authToken) {
-      console.log('No auth token found, skipping selection fetch');
+      console.log('❌ No auth token found, skipping selection fetch');
       return [];
     }
 
+    console.log('🔄 Fetching student selections from /api/student/selections...');
     const response = await fetch(`${getApiBaseUrl()}/student/selections`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -201,17 +202,22 @@ const fetchStudentSelections = async () => {
       }
     });
 
+    console.log('📡 Response status:', response.status, response.statusText);
+
     if (!response.ok) {
-      console.error('Failed to fetch student selections:', response.status);
+      const errorText = await response.text();
+      console.error('❌ Failed to fetch student selections:', response.status, errorText);
       return [];
     }
 
     const data = await response.json();
-    console.log('Raw student selections from API:', data);
+    console.log('📊 Raw student selections from API:', data);
+    console.log('   - Success:', data.success);
+    console.log('   - Selections count:', data.selections?.length || 0);
     
     if (data.success && data.selections) {
       // Map backend selections to frontend format
-      return data.selections.map((selection: any) => {
+      const mappedSelections = data.selections.map((selection: any) => {
         // electiveId is populated, so it's an object with _id, name, track, etc.
         const electiveId = typeof selection.electiveId === 'object' 
           ? (selection.electiveId._id || selection.electiveId.id)
@@ -221,6 +227,13 @@ const fetchStudentSelections = async () => {
           ? (selection.electiveId.track || '')
           : '';
         
+        console.log('📝 Mapping selection:', {
+          id: selection._id,
+          electiveId,
+          track,
+          semester: selection.semester
+        });
+
         return {
           id: selection._id || selection.id,
           studentId: selection.studentId,
@@ -232,11 +245,63 @@ const fetchStudentSelections = async () => {
           dateSelected: selection.selectedAt || selection.createdAt || new Date().toISOString()
         };
       });
+
+      console.log('✅ Mapped selections:', mappedSelections);
+      return mappedSelections;
+    }
+    
+    console.log('⚠️ No selections found in API response');
+    return [];
+  } catch (error) {
+    console.error('❌ Error fetching student selections:', error);
+    return [];
+  }
+};
+
+// Fetch feedback responses from backend
+const fetchFeedbackResponses = async () => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      console.log('No auth token found, skipping feedback responses fetch');
+      return [];
+    }
+
+    console.log('🔄 Fetching feedback responses from backend...');
+    const response = await fetch(`${getApiBaseUrl()}/feedback/responses`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch feedback responses:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('📊 Raw feedback responses from API:', data);
+    
+    if (data.success && data.responses) {
+      console.log(`✅ Loaded ${data.responses.length} feedback responses from backend`);
+      return data.responses.map((response: any) => ({
+        id: response._id || response.id,
+        templateId: response.templateId,
+        templateTitle: response.templateTitle,
+        studentId: response.studentId,
+        studentName: response.studentName,
+        studentDepartment: response.studentDepartment,
+        studentSemester: response.studentSemester,
+        studentSection: response.studentSection,
+        responses: response.responses || [],
+        submittedAt: new Date(response.submittedAt || response.createdAt)
+      }));
     }
     
     return [];
   } catch (error) {
-    console.error('Error fetching student selections:', error);
+    console.error('Error fetching feedback responses:', error);
     return [];
   }
 };
@@ -1108,19 +1173,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Fetch student selections from backend (for logged-in students)
+      console.log('🔄 Fetching student selections from backend...');
       const backendSelections = await fetchStudentSelections();
+      console.log('📊 Backend selections received:', backendSelections.length, backendSelections);
+      
       if (backendSelections.length > 0) {
         console.log('✅ Loaded student selections from backend:', backendSelections.length);
         setStudentElectives(backendSelections);
         // Save to localStorage for persistence
         localStorage.setItem('studentElectives', JSON.stringify(backendSelections));
+        console.log('💾 Saved selections to localStorage');
       } else {
+        console.log('⚠️ No selections from backend, checking localStorage...');
         // Fallback to localStorage if API fails or returns empty
         const storedSelections = localStorage.getItem('studentElectives');
         if (storedSelections) {
           const parsedSelections = JSON.parse(storedSelections);
-          console.log('📦 Loaded student selections from localStorage:', parsedSelections.length);
+          console.log('📦 Loaded student selections from localStorage:', parsedSelections.length, parsedSelections);
           setStudentElectives(parsedSelections);
+        } else {
+          console.log('❌ No selections found in localStorage either');
         }
       }
 
@@ -1140,6 +1212,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
           console.log('📦 Loaded feedback templates from localStorage:', parsedTemplates.length);
           setFeedbackTemplates(parsedTemplates);
+        }
+      }
+
+      // Fetch feedback responses from backend
+      const backendResponses = await fetchFeedbackResponses();
+      if (backendResponses.length > 0) {
+        console.log('✅ Loaded feedback responses from backend:', backendResponses.length);
+        setFeedbackResponses(backendResponses);
+        localStorage.setItem('feedbackResponses', JSON.stringify(backendResponses));
+      } else {
+        console.log('⚠️ No responses from backend, checking localStorage...');
+        // Fallback to localStorage if API fails or returns empty
+        const storedResponses = localStorage.getItem('feedbackResponses');
+        if (storedResponses) {
+          const parsedResponses = JSON.parse(storedResponses).map((response: any) => ({
+            ...response,
+            submittedAt: new Date(response.submittedAt)
+          }));
+          console.log('📦 Loaded feedback responses from localStorage:', parsedResponses.length);
+          setFeedbackResponses(parsedResponses);
+        } else {
+          console.log('❌ No feedback responses found in localStorage either');
         }
       }
     };
@@ -1401,12 +1495,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const selectElective = async (studentId: string, electiveId: string, semester: number): Promise<boolean> => {
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) {
-        console.error('No auth token found');
+      console.log('🎯 Selecting elective:', { studentId, electiveId, semester });
+      
+      // Check if already selected locally first
+      const existingSelection = studentElectives.find(
+        se => se.studentId === studentId && se.electiveId === electiveId && se.semester === semester
+      );
+      
+      if (existingSelection) {
+        console.log('⚠️ Elective already selected (found in local state):', existingSelection);
+        alert('You have already selected this elective for this semester.');
         return false;
       }
 
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.error('❌ No auth token found');
+        return false;
+      }
+
+      console.log('📡 Sending selection request to backend...');
       const response = await fetch(`${getApiBaseUrl()}/electives/select/${electiveId}`, {
         method: 'POST',
         headers: {
@@ -1421,11 +1529,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('Failed to select elective:', error);
+        console.error('❌ Failed to select elective:', error);
+        
+        // Show user-friendly error message
+        if (error.error === 'You have already selected this elective for this semester') {
+          alert('You have already selected this elective for this semester. Refreshing your selections...');
+          // Refresh selections from backend to sync state
+          const backendSelections = await fetchStudentSelections();
+          if (backendSelections.length > 0) {
+            setStudentElectives(backendSelections);
+            localStorage.setItem('studentElectives', JSON.stringify(backendSelections));
+            console.log('🔄 Refreshed selections from backend:', backendSelections.length);
+          }
+        } else {
+          alert(error.error || 'Failed to select elective');
+        }
+        
         return false;
       }
 
       const data = await response.json();
+      console.log('✅ Backend response:', data);
       
       if (data.success) {
         // Update local state with the selection from the server
@@ -1441,13 +1565,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
 
           const updatedStudentElectives = [...studentElectives, studentElective];
+          console.log('💾 Saving selection to state and localStorage:', studentElective);
           setStudentElectives(updatedStudentElectives);
           // Save to localStorage for persistence across page refreshes
           localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
-          console.log('✅ Selection saved to state and localStorage');
+          console.log('✅ Selection saved successfully! Total selections:', updatedStudentElectives.length);
         }
         
         // Refresh electives to get updated enrollment counts
+        console.log('🔄 Refreshing electives list...');
         await fetchElectives();
         
         return true;
@@ -1455,7 +1581,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return false;
     } catch (error) {
-      console.error('Error selecting elective:', error);
+      console.error('❌ Error selecting elective:', error);
       return false;
     }
   };

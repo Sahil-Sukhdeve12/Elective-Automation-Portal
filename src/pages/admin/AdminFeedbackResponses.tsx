@@ -22,6 +22,10 @@ const AdminFeedbackResponses: React.FC = () => {
   const allResponses = getFeedbackResponses();
   const templates = getActiveFeedbackTemplates();
 
+  // Debug logging
+  console.log('📊 AdminFeedbackResponses - All responses:', allResponses.length, allResponses);
+  console.log('📝 AdminFeedbackResponses - Templates:', templates.length, templates);
+
   // Filter responses based on selected filters
   const filteredResponses = allResponses.filter(response => {
     if (selectedTemplate !== 'all' && response.templateId !== selectedTemplate) return false;
@@ -90,6 +94,16 @@ const AdminFeedbackResponses: React.FC = () => {
   };
 
   const exportResponses = () => {
+    console.log('📥 Exporting feedback responses...');
+    console.log('Total responses:', allResponses.length);
+    console.log('Filtered responses:', filteredResponses.length);
+    console.log('Responses data:', filteredResponses);
+    
+    if (filteredResponses.length === 0) {
+      alert('No feedback responses to export. Please check if there are any responses submitted.');
+      return;
+    }
+    
     const csvContent = [
       ['Student Name', 'Department', 'Semester', 'Section', 'Template', 'Question', 'Answer', 'Submitted At'].join(','),
       ...filteredResponses.flatMap(response =>
@@ -106,6 +120,8 @@ const AdminFeedbackResponses: React.FC = () => {
       )
     ].join('\n');
 
+    console.log('CSV content generated:', csvContent.substring(0, 200) + '...');
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -113,6 +129,8 @@ const AdminFeedbackResponses: React.FC = () => {
     a.download = `feedback_responses_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+    
+    console.log('✅ Export completed');
   };
 
   const handleDeleteResponse = (responseId: string, studentName: string) => {

@@ -146,13 +146,26 @@ const AdminStudents: React.FC = () => {
     const reportStudents = getFilteredStudentsForReport();
     
     return reportStudents.map(student => {
+      // Get student's electives
+      const studentElectivesData = getStudentElectives(student.id);
+      const electivesList = studentElectivesData.map(se => {
+        const elective = electives.find(e => e.id === se.electiveId);
+        return elective ? `${elective.name} (${elective.code})` : 'Unknown';
+      }).join('; ');
+      
+      // Get student's tracks
+      const studentTracks = [...new Set(studentElectivesData.map(se => se.track))].join('; ');
+      
       return {
         'Roll No': student.rollNumber,
         'Name': student.name,
         'Email': student.email,
         'Department': student.department,
         'Semester': student.semester,
-        'Section': student.section
+        'Section': student.section,
+        'Track(s)': studentTracks || 'No track selected',
+        'Electives Selected': electivesList || 'No electives selected',
+        'Total Electives': studentElectivesData.length
       };
     });
   };
@@ -164,7 +177,14 @@ const AdminStudents: React.FC = () => {
     
     if (format === 'excel') {
       const csvHeaders = Object.keys(data[0] || {}).join(',');
-      const csvRows = data.map(row => Object.values(row).map(val => `"${val}"`).join(','));
+      const csvRows = data.map(row => Object.values(row).map(val => {
+        // Escape commas and quotes in CSV
+        const stringVal = String(val);
+        if (stringVal.includes(',') || stringVal.includes(';') || stringVal.includes('"')) {
+          return `"${stringVal.replace(/"/g, '""')}"`;
+        }
+        return stringVal;
+      }).join(','));
       const csvContent = [csvHeaders, ...csvRows].join('\n');
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -198,6 +218,9 @@ const AdminStudents: React.FC = () => {
           `${index + 1}. ${student.Name} (${student['Roll No']})`,
           `   Department: ${student.Department} | Semester: ${student.Semester} | Section: ${student.Section}`,
           `   Email: ${student.Email}`,
+          `   Track(s): ${student['Track(s)']}`,
+          `   Electives: ${student['Electives Selected']}`,
+          `   Total Electives: ${student['Total Electives']}`,
           '─'.repeat(80),
           ''
         ]).flat()
@@ -218,19 +241,41 @@ const AdminStudents: React.FC = () => {
   };
 
   const handleExport = (format: 'excel' | 'pdf') => {
-    const data = filteredStudents.map(student => ({
-      'Roll No': student.rollNumber,
-      'Name': student.name,
-      'Email': student.email,
-      'Department': student.department,
-      'Semester': student.semester,
-      'Section': student.section
-    }));
+    const data = filteredStudents.map(student => {
+      // Get student's electives
+      const studentElectivesData = getStudentElectives(student.id);
+      const electivesList = studentElectivesData.map(se => {
+        const elective = electives.find(e => e.id === se.electiveId);
+        return elective ? `${elective.name} (${elective.code})` : 'Unknown';
+      }).join('; ');
+      
+      // Get student's tracks
+      const studentTracks = [...new Set(studentElectivesData.map(se => se.track))].join('; ');
+      
+      return {
+        'Roll No': student.rollNumber,
+        'Name': student.name,
+        'Email': student.email,
+        'Department': student.department,
+        'Semester': student.semester,
+        'Section': student.section,
+        'Track(s)': studentTracks || 'No track selected',
+        'Electives Selected': electivesList || 'No electives selected',
+        'Total Electives': studentElectivesData.length
+      };
+    });
     
     if (format === 'excel') {
       // Create CSV content for Excel
       const csvHeaders = Object.keys(data[0] || {}).join(',');
-      const csvRows = data.map(row => Object.values(row).join(','));
+      const csvRows = data.map(row => Object.values(row).map(val => {
+        // Escape commas and quotes in CSV
+        const stringVal = String(val);
+        if (stringVal.includes(',') || stringVal.includes(';') || stringVal.includes('"')) {
+          return `"${stringVal.replace(/"/g, '""')}"`;
+        }
+        return stringVal;
+      }).join(','));
       const csvContent = [csvHeaders, ...csvRows].join('\n');
       
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -250,9 +295,17 @@ const AdminStudents: React.FC = () => {
         `Total Students: ${data.length}`,
         '',
         'STUDENT DETAILS:',
-        ...data.map((student, index) => 
-          `${index + 1}. ${student.Name} (${student['Roll No']}) - ${student.Department} - Semester ${student.Semester}`
-        )
+        '',
+        ...data.map((student, index) => [
+          `${index + 1}. ${student.Name} (${student['Roll No']})`,
+          `   Department: ${student.Department} | Semester: ${student.Semester} | Section: ${student.Section}`,
+          `   Email: ${student.Email}`,
+          `   Track(s): ${student['Track(s)']}`,
+          `   Electives: ${student['Electives Selected']}`,
+          `   Total Electives: ${student['Total Electives']}`,
+          '─'.repeat(80),
+          ''
+        ]).flat()
       ].join('\n');
       
       const blob = new Blob([pdfContent], { type: 'text/plain;charset=utf-8;' });

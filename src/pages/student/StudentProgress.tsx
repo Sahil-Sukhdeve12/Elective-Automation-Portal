@@ -12,6 +12,17 @@ const StudentProgress: React.FC = () => {
     user ? getStudentElectives(user.id) : [], 
     [user, getStudentElectives]
   );
+
+  // DEBUG: Log to understand what data we have
+  React.useEffect(() => {
+    console.log('📊 StudentProgress Debug:');
+    console.log('  - User ID:', user?.id);
+    console.log('  - User Role:', user?.role);
+    console.log('  - Student Electives:', studentElectives);
+    console.log('  - Total Electives Available:', electives.length);
+    console.log('  - Total Tracks:', tracks.length);
+    console.log('  - Raw localStorage studentElectives:', localStorage.getItem('studentElectives'));
+  }, [user, studentElectives, electives, tracks]);
   
   // Group electives by semester
   const electivesBySemester = React.useMemo(() => {
@@ -24,6 +35,7 @@ const StudentProgress: React.FC = () => {
       semesters[se.semester].push(se);
     });
     
+    console.log('📊 Electives by semester:', semesters);
     return semesters;
   }, [studentElectives]);
 
@@ -37,6 +49,8 @@ const StudentProgress: React.FC = () => {
   const currentTrack = currentTrackName 
     ? tracks.find(t => t.name === currentTrackName)
     : null;
+
+  console.log('🎯 Track Debug:', { currentTrackName, currentTrack });
 
   // Get current semester
   const currentSemester = user.semester || 1;

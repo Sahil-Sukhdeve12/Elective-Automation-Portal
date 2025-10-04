@@ -125,9 +125,17 @@ const fetchTracks = async () => {
 
 const fetchSyllabi = async () => {
   try {
-    console.log('Fetching syllabi from MongoDB API...');
+    console.log('📚 Fetching syllabi from MongoDB API...');
     const syllabi = await syllabusApi.getAllSyllabi();
     console.log('✅ Syllabi fetched successfully from MongoDB:', syllabi.length);
+    console.log('📄 Syllabi details:', syllabi.map(s => ({
+      id: s.id,
+      electiveId: s.electiveId,
+      fileName: s.pdfFileName,
+      hasData: !!s.pdfData,
+      dataLength: s.pdfData?.length || 0,
+      isActive: s.isActive
+    })));
     
     // Convert uploadedAt strings to Date objects
     const mappedSyllabi = syllabi.map((syllabus: SyllabusData) => ({
@@ -137,7 +145,7 @@ const fetchSyllabi = async () => {
     
     return mappedSyllabi;
   } catch (error) {
-    // console.error('Error fetching syllabi from MongoDB:', error);
+    console.error('❌ Error fetching syllabi from MongoDB:', error);
     // Fallback to localStorage if API fails
     const storedSyllabi = localStorage.getItem('syllabi');
     if (storedSyllabi) {
@@ -145,9 +153,10 @@ const fetchSyllabi = async () => {
         ...syllabus,
         uploadedAt: new Date(syllabus.uploadedAt)
       }));
-      console.log('Using syllabi from localStorage fallback:', parsedSyllabi.length);
+      console.log('⚠️ Using syllabi from localStorage fallback:', parsedSyllabi.length);
       return parsedSyllabi;
     }
+    console.warn('⚠️ No syllabi found in localStorage either');
     return [];
   }
 };
@@ -490,6 +499,7 @@ interface DataContextType {
   deleteElective: (id: string) => Promise<boolean>;
   refreshElectives: () => Promise<boolean>;
   refreshUsers: () => Promise<boolean>;
+  refreshStudentSelections: () => Promise<boolean>;
   deleteUser: (userId: string) => Promise<boolean>;
   getRecommendations: (studentId: string, semester: number) => Elective[];
   getElectiveRecommendation: (studentId: string, userPreferences: { interests: string[]; careerGoals: string; difficulty: string }) => Elective[];
@@ -1497,17 +1507,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🎯 Selecting elective:', { studentId, electiveId, semester });
       
-      // Check if already selected locally first
-      const existingSelection = studentElectives.find(
-        se => se.studentId === studentId && se.electiveId === electiveId && se.semester === semester
-      );
-      
-      if (existingSelection) {
-        console.log('⚠️ Elective already selected (found in local state):', existingSelection);
-        alert('You have already selected this elective for this semester.');
-        return false;
-      }
-
       const token = localStorage.getItem('authToken');
       if (!token) {
         console.error('❌ No auth token found');
@@ -1533,14 +1532,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Show user-friendly error message
         if (error.error === 'You have already selected this elective for this semester') {
-          alert('You have already selected this elective for this semester. Refreshing your selections...');
-          // Refresh selections from backend to sync state
-          const backendSelections = await fetchStudentSelections();
-          if (backendSelections.length > 0) {
-            setStudentElectives(backendSelections);
-            localStorage.setItem('studentElectives', JSON.stringify(backendSelections));
-            console.log('🔄 Refreshed selections from backend:', backendSelections.length);
-          }
+          alert('You have already selected this elective for this semester.');
         } else {
           alert(error.error || 'Failed to select elective');
         }
@@ -1552,24 +1544,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('✅ Backend response:', data);
       
       if (data.success) {
-        // Update local state with the selection from the server
-        const elective = electives.find(e => e.id === electiveId);
-        if (elective) {
-          const studentElective: StudentElective = {
-            id: data.selection?._id || `se_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            studentId,
-            electiveId,
-            semester,
-            dateSelected: data.selection?.createdAt || new Date().toISOString(),
-            track: elective.track
-          };
-
-          const updatedStudentElectives = [...studentElectives, studentElective];
-          console.log('💾 Saving selection to state and localStorage:', studentElective);
-          setStudentElectives(updatedStudentElectives);
-          // Save to localStorage for persistence across page refreshes
-          localStorage.setItem('studentElectives', JSON.stringify(updatedStudentElectives));
-          console.log('✅ Selection saved successfully! Total selections:', updatedStudentElectives.length);
+        console.log('🔄 Selection saved to backend! Now refreshing selections from database...');
+        
+        // CRITICAL FIX: Refresh selections from backend to ensure state is in sync
+        const updatedSelections = await fetchStudentSelections();
+        console.log('� Refreshed selections from backend:', updatedSelections.length);
+        
+        if (updatedSelections.length > 0) {
+          setStudentElectives(updatedSelections);
+          localStorage.setItem('studentElectives', JSON.stringify(updatedSelections));
+          console.log('✅ State updated with fresh data from MongoDB!');
+        } else {
+          console.warn('⚠️ No selections returned after refresh, keeping current state');
         }
         
         // Refresh electives to get updated enrollment counts
@@ -2620,11 +2606,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getSyllabus = (electiveId: string): Syllabus | null => {
-    return syllabi.find(s => s.electiveId === electiveId && s.isActive) || null;
+    console.log('🔍 Getting syllabus for elective:', electiveId);
+    console.log('   Available syllabi count:', syllabi.length);
+    console.log('   All elective IDs:', syllabi.map(s => s.electiveId));
+    
+    const found = syllabi.find(s => s.electiveId === electiveId && s.isActive);
+    console.log('   Found syllabus:', !!found, found ? `(${found.pdfFileName})` : 'Not found');
+    
+    return found || null;
   };
 
   const getAllSyllabi = (): Syllabus[] => {
-    return syllabi.filter(s => s.isActive);
+    const activeSyllabi = syllabi.filter(s => s.isActive);
+    console.log('📚 Getting all syllabi:', activeSyllabi.length, 'active out of', syllabi.length, 'total');
+    return activeSyllabi;
   };
 
   const updateSyllabus = async (syllabusId: string, updates: Partial<Syllabus>): Promise<boolean> => {
@@ -2708,6 +2703,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshStudentSelections = async (): Promise<boolean> => {
+    try {
+      console.log('🔄 Refreshing student selections from MongoDB...');
+      const refreshedSelections = await fetchStudentSelections();
+      
+      if (refreshedSelections) {
+        console.log('✅ Refreshed selections from backend:', refreshedSelections.length);
+        setStudentElectives(refreshedSelections);
+        localStorage.setItem('studentElectives', JSON.stringify(refreshedSelections));
+        console.log('💾 Updated state and localStorage with fresh data');
+        return true;
+      }
+      
+      console.warn('⚠️ No selections returned from refresh');
+      return false;
+    } catch (error) {
+      console.error('❌ Error refreshing student selections:', error);
+      return false;
+    }
+  };
+
   const deleteUser = async (userId: string): Promise<boolean> => {
     try {
       // Delete user via API
@@ -2779,6 +2795,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       submitFeedback,
       refreshElectives,
       refreshUsers,
+      refreshStudentSelections,
       deleteUser,
       selectElective,
       getStudentElectives,

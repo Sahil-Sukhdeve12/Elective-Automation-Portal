@@ -97,6 +97,16 @@ const AdminStudents: React.FC = () => {
     }));
   };
 
+  // Get primary track for a student (the track with most electives)
+  const getPrimaryTrack = (studentId: string): string => {
+    const tracks = getStudenttracks(studentId);
+    if (tracks.length === 0) return 'No track selected';
+    
+    // Sort by count descending and get the first one
+    const primaryTrack = tracks.sort((a, b) => b.count - a.count)[0];
+    return primaryTrack.track;
+  };
+
   // Get filtered students for advanced report
   const getFilteredStudentsForReport = () => {
     let reportStudents = allStudents;
@@ -153,7 +163,10 @@ const AdminStudents: React.FC = () => {
         return elective ? `${elective.name} (${elective.code})` : 'Unknown';
       }).join('; ');
       
-      // Get student's tracks
+      // Get primary track (track with most electives)
+      const primaryTrack = getPrimaryTrack(student.id);
+      
+      // Get all student's tracks
       const studentTracks = [...new Set(studentElectivesData.map(se => se.track))].join('; ');
       
       return {
@@ -163,7 +176,8 @@ const AdminStudents: React.FC = () => {
         'Department': student.department,
         'Semester': student.semester,
         'Section': student.section,
-        'Track(s)': studentTracks || 'No track selected',
+        'Primary Track': primaryTrack,
+        'All Track(s)': studentTracks || 'No track selected',
         'Electives Selected': electivesList || 'No electives selected',
         'Total Electives': studentElectivesData.length
       };
@@ -218,7 +232,8 @@ const AdminStudents: React.FC = () => {
           `${index + 1}. ${student.Name} (${student['Roll No']})`,
           `   Department: ${student.Department} | Semester: ${student.Semester} | Section: ${student.Section}`,
           `   Email: ${student.Email}`,
-          `   Track(s): ${student['Track(s)']}`,
+          `   Primary Track: ${student['Primary Track']}`,
+          `   All Tracks: ${student['All Track(s)']}`,
           `   Electives: ${student['Electives Selected']}`,
           `   Total Electives: ${student['Total Electives']}`,
           '─'.repeat(80),
@@ -249,7 +264,10 @@ const AdminStudents: React.FC = () => {
         return elective ? `${elective.name} (${elective.code})` : 'Unknown';
       }).join('; ');
       
-      // Get student's tracks
+      // Get primary track (track with most electives)
+      const primaryTrack = getPrimaryTrack(student.id);
+      
+      // Get all student's tracks
       const studentTracks = [...new Set(studentElectivesData.map(se => se.track))].join('; ');
       
       return {
@@ -259,7 +277,8 @@ const AdminStudents: React.FC = () => {
         'Department': student.department,
         'Semester': student.semester,
         'Section': student.section,
-        'Track(s)': studentTracks || 'No track selected',
+        'Primary Track': primaryTrack,
+        'All Track(s)': studentTracks || 'No track selected',
         'Electives Selected': electivesList || 'No electives selected',
         'Total Electives': studentElectivesData.length
       };
@@ -300,7 +319,8 @@ const AdminStudents: React.FC = () => {
           `${index + 1}. ${student.Name} (${student['Roll No']})`,
           `   Department: ${student.Department} | Semester: ${student.Semester} | Section: ${student.Section}`,
           `   Email: ${student.Email}`,
-          `   Track(s): ${student['Track(s)']}`,
+          `   Primary Track: ${student['Primary Track']}`,
+          `   All Tracks: ${student['All Track(s)']}`,
           `   Electives: ${student['Electives Selected']}`,
           `   Total Electives: ${student['Total Electives']}`,
           '─'.repeat(80),

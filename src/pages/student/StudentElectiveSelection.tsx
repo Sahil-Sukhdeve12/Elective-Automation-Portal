@@ -37,12 +37,37 @@ const StudentElectiveSelection: React.FC = () => {
     return allStudentElectives.filter(se => se.semester === electiveSelectionSemester);
   }, [user, getStudentElectives, electiveSelectionSemester]);
 
-  // Get student's current track from their previous elective selections
-  const studentTrack = useMemo(() => {
+  // Get student's PRIMARY track (the track with most elective selections)
+  const studentPrimaryTrack = useMemo(() => {
     if (!user) return null;
     const allStudentElectives = getStudentElectives(user.id);
-    // Get track from first selection (students typically follow one track)
-    return allStudentElectives.length > 0 ? allStudentElectives[0].track : null;
+    
+    if (allStudentElectives.length === 0) return null;
+    
+    // Count electives per track
+    const trackCounts: Record<string, number> = {};
+    allStudentElectives.forEach(se => {
+      if (se.track) {
+        trackCounts[se.track] = (trackCounts[se.track] || 0) + 1;
+      }
+    });
+    
+    // Find track with most electives (primary track)
+    let primaryTrack = null;
+    let maxCount = 0;
+    Object.entries(trackCounts).forEach(([track, count]) => {
+      if (count > maxCount) {
+        maxCount = count;
+        primaryTrack = track;
+      }
+    });
+    
+    console.log('🎯 Student Primary Track Calculation:');
+    console.log('   - Total selections:', allStudentElectives.length);
+    console.log('   - Track counts:', trackCounts);
+    console.log('   - Primary track:', primaryTrack);
+    
+    return primaryTrack;
   }, [user, getStudentElectives]);
 
   // Get admin-configured categories
@@ -268,6 +293,23 @@ const StudentElectiveSelection: React.FC = () => {
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Choose from available elective categories to enhance your learning experience
             </p>
+            
+            {/* Primary Track Info Banner */}
+            {studentPrimaryTrack && (
+              <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-300 dark:border-green-700 rounded-lg max-w-2xl mx-auto">
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-2xl">🎯</span>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-green-800 dark:text-green-200">Your Primary Track</p>
+                    <p className="text-lg font-bold text-green-900 dark:text-green-100">{studentPrimaryTrack}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-green-700 dark:text-green-300 mt-2">
+                  ⭐ Electives from this track will be marked as "Recommended" to help you continue your specialization
+                </p>
+              </div>
+            )}
+            
             <div className="mt-4 p-4 bg-blue-100 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-blue-800 dark:text-blue-200">
                 You can select one elective from each category (up to {totalElectiveLimit} total). Currently selected: {selectedCategories.size}/{totalElectiveLimit}
@@ -375,7 +417,7 @@ const StudentElectiveSelection: React.FC = () => {
             <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
             Back to Categories
           </button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
               {categoryData.find(c => c.id === selectedCategory)?.title} Electives
             </h1>
@@ -384,6 +426,26 @@ const StudentElectiveSelection: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* Primary Track Info Banner */}
+        {studentPrimaryTrack && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-l-4 border-green-500 dark:border-green-400 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <span className="text-2xl mt-1">🎯</span>
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                  <p className="text-sm font-semibold text-green-800 dark:text-green-200">Your Primary Track:</p>
+                  <span className="px-3 py-1 rounded-full text-sm font-bold bg-green-600 text-white">
+                    {studentPrimaryTrack}
+                  </span>
+                </div>
+                <p className="text-xs text-green-700 dark:text-green-300">
+                  Electives matching your primary track are marked with ⭐ <span className="font-semibold">Recommended for Your Track</span> to help you specialize further.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Track Selection */}
         {tracks.length > 0 && (
@@ -450,9 +512,9 @@ const StudentElectiveSelection: React.FC = () => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{elective.name}</h3>
-                        {studentTrack && elective.track === studentTrack && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white">
-                            ⭐ Recommended
+                        {studentPrimaryTrack && elective.track === studentPrimaryTrack && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md animate-pulse">
+                            ⭐ Recommended for Your Track
                           </span>
                         )}
                         <button

@@ -13,26 +13,46 @@ const StudentRoadmap: React.FC = () => {
 
   const handleViewSyllabus = async (electiveId: string) => {
     try {
+      console.log('🔍 Viewing syllabus for elective:', electiveId);
       const syllabusData = getSyllabus(electiveId);
+      
+      console.log('📄 Syllabus data retrieved:', {
+        found: !!syllabusData,
+        hasData: !!syllabusData?.pdfData,
+        fileName: syllabusData?.pdfFileName,
+        dataLength: syllabusData?.pdfData?.length
+      });
+      
       if (syllabusData?.pdfData) {
-        // Open PDF from base64 data
+        // Open PDF from base64 data using better method
         const win = window.open('', '_blank');
         if (win) {
           win.document.write(`
             <html>
-              <head><title>${syllabusData.pdfFileName}</title></head>
-              <body style="margin:0">
-                <embed width="100%" height="100%" src="${syllabusData.pdfData}" type="application/pdf" />
+              <head>
+                <title>${syllabusData.pdfFileName}</title>
+                <style>
+                  body { margin: 0; padding: 0; overflow: hidden; }
+                  iframe { border: none; }
+                </style>
+              </head>
+              <body>
+                <iframe width="100%" height="100%" src="${syllabusData.pdfData}" type="application/pdf"></iframe>
               </body>
             </html>
           `);
+          console.log('✅ PDF opened in new window');
+        } else {
+          console.error('❌ Failed to open new window (popup blocker?)');
+          alert('Please allow popups for this site to view the syllabus');
         }
       } else {
+        console.warn('⚠️ No syllabus data available');
         alert('Syllabus not available for this elective');
       }
     } catch (error) {
-      console.error('Error viewing syllabus:', error);
-      alert('Unable to load syllabus');
+      console.error('❌ Error viewing syllabus:', error);
+      alert('Unable to load syllabus. Please try again.');
     }
   };
 

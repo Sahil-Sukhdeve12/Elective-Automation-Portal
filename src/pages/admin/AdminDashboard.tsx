@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData, AlertNotification } from '../../contexts/DataContext';
 import { emailApi, type EmailNotificationData } from '../../services/api';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Users, BookOpen, BarChart3, Building2, Trash2, Bell, FileText } from 'lucide-react';
+import { Users, BookOpen, BarChart3, Building2, Trash2, Bell, FileText, ChevronDown } from 'lucide-react';
 import AdminSyllabus from './AdminSyllabus';
 
 // Alert Management Component
@@ -34,6 +34,20 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
     sendEmail: false
   });
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false); // Dropdown state
+  const sectionDropdownRef = useRef<HTMLDivElement>(null); // Ref for click outside
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sectionDropdownRef.current && !sectionDropdownRef.current.contains(event.target as Node)) {
+        setSectionDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const sendEmailNotification = async (alertData: typeof newAlert, targetUsers: Array<{email: string, name: string}>) => {
     try {
@@ -210,32 +224,65 @@ const AlertManagement: React.FC<AlertManagementProps> = ({
             </div>
           </div>
 
-          <div>
+          <div ref={sectionDropdownRef} className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Section
             </label>
-            <div className="flex flex-wrap gap-2">
-              {sections.map(section => (
-                <label key={section} className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={newAlert.targetSections.includes(section)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setNewAlert({ ...newAlert, targetSections: [...newAlert.targetSections, section] });
-                      } else {
-                        setNewAlert({ ...newAlert, targetSections: newAlert.targetSections.filter(s => s !== section) });
-                      }
-                    }}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">{section}</span>
-                </label>
-              ))}
-              {sections.length === 0 && (
-                <p className="text-sm text-gray-500">No sections available</p>
-              )}
-            </div>
+            {sections.length > 0 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSectionDropdownOpen(!sectionDropdownOpen)}
+                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-left flex justify-between items-center"
+                >
+                  <span className={newAlert.targetSections.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                    {newAlert.targetSections.length === 0 
+                      ? 'All Sections' 
+                      : `${newAlert.targetSections.length} selected: ${newAlert.targetSections.join(', ')}`}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${sectionDropdownOpen ? 'transform rotate-180' : ''}`} />
+                </button>
+                
+                {sectionDropdownOpen && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="p-2">
+                      <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newAlert.targetSections.length === 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewAlert({ ...newAlert, targetSections: [] });
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-900">All Sections</span>
+                      </label>
+                      {sections.map(section => (
+                        <label key={section} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newAlert.targetSections.includes(section)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewAlert({ ...newAlert, targetSections: [...newAlert.targetSections, section] });
+                              } else {
+                                setNewAlert({ ...newAlert, targetSections: newAlert.targetSections.filter(s => s !== section) });
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">Section {section}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">No sections available</p>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">

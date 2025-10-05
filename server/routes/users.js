@@ -1,6 +1,7 @@
 import express from 'express';
 import User from '../models/User.js';
-import { auth, isAdmin } from '../middleware/auth.js';
+import StudentElective from '../models/StudentElective.js';
+import { auth, isAdmin, isStudent } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -93,6 +94,35 @@ router.delete('/:id', auth, isAdmin, async (req, res) => {
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get student selections (student only)
+router.get('/student/selections', auth, isStudent, async (req, res) => {
+  try {
+    console.log('📥 Fetching selections for student:', req.user.id);
+    
+    // Find all selections for this student
+    const selections = await StudentElective.find({ 
+      studentId: req.user.id 
+    })
+    .populate('electiveId', 'name code credits track category electiveCategory semester')
+    .sort({ semester: 1, selectedAt: 1 });
+
+    console.log('✅ Found', selections.length, 'selections for student:', req.user.id);
+    
+    res.json({
+      success: true,
+      selections: selections,
+      count: selections.length
+    });
+  } catch (error) {
+    console.error('❌ Get student selections error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      details: error.message 
+    });
   }
 });
 

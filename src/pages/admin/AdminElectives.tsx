@@ -10,7 +10,8 @@ const AdminElectives: React.FC = () => {
     tracks, 
     addElective, 
     updateElective, 
-    deleteElective, 
+    deleteElective,
+    clearElectiveEnrollment,
     refreshElectives,
     getAvailableDepartments,
     getAvailableSemesters,
@@ -263,6 +264,25 @@ const AdminElectives: React.FC = () => {
     }
   };
 
+  const handleClearEnrollment = async (elective: Elective) => {
+    if (confirm(`Are you sure you want to clear all enrollment data for "${elective.name}"? This will reset the enrolled student count to 0.`)) {
+      const success = await clearElectiveEnrollment(elective.id);
+      if (success) {
+        addNotification({
+          type: 'success',
+          title: 'Enrollment Cleared',
+          message: `Enrollment for ${elective.name} has been reset to 0.`
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          title: 'Error',
+          message: 'Failed to clear enrollment. Please try again.'
+        });
+      }
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
@@ -438,6 +458,18 @@ const AdminElectives: React.FC = () => {
             }}
           />
         </div>
+        {/* Clear Enrollment Button */}
+        {(elective.enrolledStudents ?? 0) > 0 && (
+          <div className="mt-2">
+            <button
+              onClick={() => handleClearEnrollment(elective)}
+              className="w-full bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 transition-colors flex items-center justify-center"
+            >
+              <XCircle className="w-3 h-3 mr-1" />
+              Clear Enrollment
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Deadline Information */}

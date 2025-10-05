@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, FileText, Eye, Trash2, CheckCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, FileText, Eye, Trash2, CheckCircle, ChevronDown } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -50,6 +50,20 @@ const AdminFeedback: React.FC = () => {
     }]
   });
   const [showAddForm, setShowAddForm] = useState(false);
+  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false); // Dropdown state
+  const sectionDropdownRef = useRef<HTMLDivElement>(null); // Ref for click outside
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sectionDropdownRef.current && !sectionDropdownRef.current.contains(event.target as Node)) {
+        setSectionDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Get elective names based on selected category
   const getElectivesByCategory = () => {
@@ -371,46 +385,78 @@ const AdminFeedback: React.FC = () => {
                 </p>
               </div>
 
-              <div>
+              <div ref={sectionDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Target Section (Optional)
                 </label>
-                <div className="space-y-2">
-                  {availableSections.length > 0 ? (
-                    availableSections.map(section => (
-                      <label key={section} className="flex items-center space-x-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={newTemplate.targetSection.includes(section)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setNewTemplate(prev => ({
-                                ...prev,
-                                targetSection: [...prev.targetSection, section]
-                              }));
-                            } else {
-                              setNewTemplate(prev => ({
-                                ...prev,
-                                targetSection: prev.targetSection.filter(s => s !== section)
-                              }));
-                            }
-                          }}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center">
-                          Section {section}
-                          {newTemplate.targetSection.includes(section) && (
-                            <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
-                          )}
-                        </span>
-                      </label>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                      No sections found in database. Add students with sections first.
-                    </p>
-                  )}
-                </div>
+                {availableSections.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSectionDropdownOpen(!sectionDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-left flex justify-between items-center"
+                    >
+                      <span className={newTemplate.targetSection.length === 0 ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}>
+                        {newTemplate.targetSection.length === 0 
+                          ? 'All Sections' 
+                          : `${newTemplate.targetSection.length} selected: ${newTemplate.targetSection.join(', ')}`}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${sectionDropdownOpen ? 'transform rotate-180' : ''}`} />
+                    </button>
+                    
+                    {sectionDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        <div className="p-2">
+                          <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={newTemplate.targetSection.length === 0}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setNewTemplate(prev => ({ ...prev, targetSection: [] }));
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">All Sections</span>
+                          </label>
+                          {availableSections.map(section => (
+                            <label key={section} className="flex items-center space-x-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={newTemplate.targetSection.includes(section)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setNewTemplate(prev => ({
+                                      ...prev,
+                                      targetSection: [...prev.targetSection, section]
+                                    }));
+                                  } else {
+                                    setNewTemplate(prev => ({
+                                      ...prev,
+                                      targetSection: prev.targetSection.filter(s => s !== section)
+                                    }));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center">
+                                Section {section}
+                                {newTemplate.targetSection.includes(section) && (
+                                  <CheckCircle className="ml-2 h-4 w-4 text-green-500" />
+                                )}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    No sections found in database. Add students with sections first.
+                  </p>
+                )}
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   Select specific sections or leave all unchecked to show to all sections
                 </p>

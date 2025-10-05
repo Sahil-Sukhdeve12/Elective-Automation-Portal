@@ -8,6 +8,8 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import electiveRoutes from './routes/electives.js';
 import userRoutes from './routes/users.js';
+import studentRoutes from './routes/students.js';
+import systemConfigRoutes from './routes/systemConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +32,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/electives', electiveRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/student', studentRoutes);
+app.use('/api/system-config', systemConfigRoutes);
 
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, '../dist')));

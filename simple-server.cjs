@@ -1108,6 +1108,46 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
   }
 });
 
+// Clear enrollment count (Admin only) - MUST come before generic /:id routes
+app.put('/api/electives/:id/clear-enrollment', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { id } = req.params;
+    console.log('🔄 Clearing enrollment for elective:', id);
+    
+    const elective = await Elective.findByIdAndUpdate(
+      id,
+      { enrolledStudents: 0 },
+      { new: true, runValidators: true }
+    );
+
+    if (!elective) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Elective not found' 
+      });
+    }
+
+    console.log('✅ Enrollment cleared successfully:', elective._id);
+    res.json({
+      success: true,
+      message: 'Enrollment cleared successfully',
+      elective: elective
+    });
+  } catch (error) {
+    console.error('❌ Error clearing enrollment:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to clear enrollment',
+      details: error.message 
+    });
+  }
+});
+
 // Update elective (Admin only)
 app.put('/api/electives/:id', authenticateToken, async (req, res) => {
   try {
@@ -1329,6 +1369,53 @@ app.get('/api/student/selections', authenticateToken, async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch selections',
+      details: error.message 
+    });
+  }
+});
+
+// Get ALL student elective selections (Admin only)
+app.get('/api/student/all-selections', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    const selections = await StudentElectiveSelection.find({})
+      .populate('electiveId', 'name code credits track category')
+      .populate('studentId', 'name email rollNumber department semester section')
+      .sort({ semester: 1, selectedAt: -1 });
+    
+    console.log(`📚 Admin retrieved ${selections.length} total elective selections from MongoDB`);
+    
+    res.json({
+      success: true,
+      count: selections.length,
+      selections: selections.map(selection => ({
+        _id: selection._id,
+        studentId: selection.studentId?._id || selection.studentId,
+        electiveId: selection.electiveId,
+        semester: selection.semester,
+        category: selection.category,
+        status: selection.status,
+        selectedAt: selection.selectedAt || selection.createdAt,
+        studentName: selection.studentId?.name,
+        studentEmail: selection.studentId?.email,
+        studentRollNumber: selection.studentId?.rollNumber,
+        studentDepartment: selection.studentId?.department,
+        studentSemester: selection.studentId?.semester,
+        studentSection: selection.studentId?.section
+      }))
+    });
+  } catch (error) {
+    console.error('❌ Error fetching all student selections:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch all selections',
       details: error.message 
     });
   }
@@ -1816,6 +1903,43 @@ app.post('/api/feedback/responses', authenticateToken, async (req, res) => {
       success: false,
       error: 'Failed to submit feedback',
       details: error.message
+    });
+  }
+});
+
+// Delete feedback response (Admin only)
+app.delete('/api/feedback/responses/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    const { id } = req.params;
+    console.log('🗑️ Deleting feedback response:', id);
+    
+    const deletedResponse = await FeedbackResponse.findByIdAndDelete(id);
+
+    if (!deletedResponse) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Feedback response not found' 
+      });
+    }
+
+    console.log('✅ Feedback response deleted successfully:', deletedResponse._id);
+    res.json({
+      success: true,
+      message: 'Feedback response deleted successfully'
+    });
+  } catch (error) {
+    console.error('❌ Error deleting feedback response:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete feedback response',
+      details: error.message 
     });
   }
 });

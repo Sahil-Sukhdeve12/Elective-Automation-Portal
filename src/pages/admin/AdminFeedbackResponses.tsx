@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
-import { MessageSquare, User, Clock, Filter, Eye, Download, Star, Trash2 } from 'lucide-react';
+import { MessageSquare, User, Clock, Filter, Eye, Download, Star, Trash2, ChevronDown } from 'lucide-react';
 
 const AdminFeedbackResponses: React.FC = () => {
   const { 
@@ -15,8 +15,22 @@ const AdminFeedbackResponses: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [selectedSemester, setSelectedSemester] = useState<string>('all');
-  const [selectedSection, setSelectedSection] = useState<string>('all');
+  const [selectedSection, setSelectedSection] = useState<string[]>([]); // Changed to array for multi-select
+  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false); // Dropdown state
+  const sectionDropdownRef = useRef<HTMLDivElement>(null); // Ref for click outside
   const [viewDetails, setViewDetails] = useState<string | null>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sectionDropdownRef.current && !sectionDropdownRef.current.contains(event.target as Node)) {
+        setSectionDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Get all feedback responses and templates
   const allResponses = getFeedbackResponses();
@@ -31,7 +45,7 @@ const AdminFeedbackResponses: React.FC = () => {
     if (selectedTemplate !== 'all' && response.templateId !== selectedTemplate) return false;
     if (selectedDepartment !== 'all' && response.studentDepartment !== selectedDepartment) return false;
     if (selectedSemester !== 'all' && response.studentSemester !== parseInt(selectedSemester)) return false;
-    if (selectedSection !== 'all' && response.studentSection !== selectedSection) return false;
+    if (selectedSection.length > 0 && response.studentSection && !selectedSection.includes(response.studentSection)) return false; // Multi-select logic
     return true;
   });
 
@@ -133,9 +147,9 @@ const AdminFeedbackResponses: React.FC = () => {
     console.log('✅ Export completed');
   };
 
-  const handleDeleteResponse = (responseId: string, studentName: string) => {
+  const handleDeleteResponse = async (responseId: string, studentName: string) => {
     if (window.confirm(`Are you sure you want to delete the feedback response from ${studentName}?`)) {
-      deleteFeedbackResponse(responseId);
+      await deleteFeedbackResponse(responseId);
     }
   };
 
@@ -261,22 +275,59 @@ const AdminFeedbackResponses: React.FC = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <div ref={sectionDropdownRef} className="relative">
+            <label htmlFor="section-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Section
             </label>
-            <select
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            <button
+              type="button"
+              onClick={() => setSectionDropdownOpen(!sectionDropdownOpen)}
+              className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-left flex justify-between items-center"
             >
-              <option value="all">All Sections</option>
-              {sections.map(sec => (
-                <option key={sec} value={sec}>
-                  Section {sec}
-                </option>
-              ))}
-            </select>
+              <span className={selectedSection.length === 0 ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}>
+                {selectedSection.length === 0 
+                  ? 'All Sections' 
+                  : `${selectedSection.length} selected: ${selectedSection.join(', ')}`}
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${sectionDropdownOpen ? 'transform rotate-180' : ''}`} />
+            </button>
+            
+            {sectionDropdownOpen && (
+              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                <div className="p-2">
+                  <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedSection.length === 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSection([]);
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">All Sections</span>
+                  </label>
+                  {sections.map(sec => (
+                    <label key={sec} className="flex items-center space-x-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedSection.includes(sec)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedSection(prev => [...prev, sec]);
+                          } else {
+                            setSelectedSection(prev => prev.filter(s => s !== sec));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Section {sec}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

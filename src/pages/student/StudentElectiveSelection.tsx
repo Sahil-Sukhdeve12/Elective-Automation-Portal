@@ -201,7 +201,7 @@ const StudentElectiveSelection: React.FC = () => {
     setSelectedTrack(''); // Reset track selection
   };
 
-  const handleElectiveSelect = (electiveId: string) => {
+  const handleElectiveSelect = async (electiveId: string) => {
     const elective = electives.find(e => e.id === electiveId);
     if (!elective) return;
 
@@ -250,17 +250,32 @@ const StudentElectiveSelection: React.FC = () => {
     }
 
     try {
-      selectElective(user.id, electiveId, electiveSelectionSemester);
-      addNotification({
-        type: 'success',
-        title: 'Elective Selected',
-        message: `You have successfully selected "${elective.name}" for Semester ${electiveSelectionSemester}!`
-      });
+      console.log('🎯 Student selecting elective:', { electiveId, electiveName: elective.name, semester: electiveSelectionSemester });
       
-      // Reset selections to go back to category view
-      setSelectedCategory(null);
-      setSelectedTrack('');
-    } catch {
+      // CRITICAL FIX: Await the selectElective to ensure database save completes
+      const success = await selectElective(user.id, electiveId, electiveSelectionSemester);
+      
+      if (success) {
+        console.log('✅ Elective selection saved to database successfully!');
+        addNotification({
+          type: 'success',
+          title: 'Elective Selected',
+          message: `You have successfully selected "${elective.name}" for Semester ${electiveSelectionSemester}!`
+        });
+        
+        // Reset selections to go back to category view
+        setSelectedCategory(null);
+        setSelectedTrack('');
+      } else {
+        console.error('❌ Failed to save elective selection to database');
+        addNotification({
+          type: 'error',
+          title: 'Selection Failed',
+          message: 'Failed to save elective selection to database. Please try again.'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error selecting elective:', error);
       addNotification({
         type: 'error',
         title: 'Selection Failed',

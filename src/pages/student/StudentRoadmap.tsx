@@ -24,27 +24,49 @@ const StudentRoadmap: React.FC = () => {
       });
       
       if (syllabusData?.pdfData) {
-        // Open PDF from base64 data using better method
-        const win = window.open('', '_blank');
-        if (win) {
-          win.document.write(`
-            <html>
-              <head>
-                <title>${syllabusData.pdfFileName}</title>
-                <style>
-                  body { margin: 0; padding: 0; overflow: hidden; }
-                  iframe { border: none; }
-                </style>
-              </head>
-              <body>
-                <iframe width="100%" height="100%" src="${syllabusData.pdfData}" type="application/pdf"></iframe>
-              </body>
-            </html>
-          `);
-          console.log('✅ PDF opened in new window');
-        } else {
-          console.error('❌ Failed to open new window (popup blocker?)');
-          alert('Please allow popups for this site to view the syllabus');
+        try {
+          // Extract base64 data from data URL
+          let base64Data = syllabusData.pdfData;
+          
+          // Check if it's already a data URL
+          if (base64Data.startsWith('data:')) {
+            // Extract just the base64 part
+            const base64Index = base64Data.indexOf('base64,');
+            if (base64Index !== -1) {
+              base64Data = base64Data.substring(base64Index + 7);
+            }
+          }
+          
+          console.log('📦 Base64 data length:', base64Data.length);
+          console.log('📦 First 50 chars:', base64Data.substring(0, 50));
+          
+          // Convert base64 to binary
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          // Create blob
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          
+          console.log('✅ Created blob URL:', url);
+          console.log('✅ Blob size:', blob.size, 'bytes');
+          
+          // Open in new window
+          const win = window.open(url, '_blank');
+          if (!win) {
+            console.error('❌ Failed to open new window (popup blocker?)');
+            alert('Please allow popups for this site to view the syllabus');
+          } else {
+            console.log('✅ PDF opened in new window');
+            // Clean up the URL after a delay
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }
+        } catch (parseError) {
+          console.error('❌ Error parsing PDF data:', parseError);
+          alert('Failed to parse PDF data. The file may be corrupted.');
         }
       } else {
         console.warn('⚠️ No syllabus data available');
@@ -53,6 +75,54 @@ const StudentRoadmap: React.FC = () => {
     } catch (error) {
       console.error('❌ Error viewing syllabus:', error);
       alert('Unable to load syllabus. Please try again.');
+    }
+  };
+
+  const handleDownloadSyllabus = (electiveId: string) => {
+    try {
+      const syllabusData = getSyllabus(electiveId);
+      
+      if (syllabusData?.pdfData) {
+        // Extract base64 data from data URL
+        let base64Data = syllabusData.pdfData;
+        
+        // Check if it's already a data URL
+        if (base64Data.startsWith('data:')) {
+          // Extract just the base64 part
+          const base64Index = base64Data.indexOf('base64,');
+          if (base64Index !== -1) {
+            base64Data = base64Data.substring(base64Index + 7);
+          }
+        }
+        
+        // Convert base64 to binary
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Create blob and download
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = syllabusData.pdfFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        
+        console.log('✅ PDF downloaded:', syllabusData.pdfFileName);
+      } else {
+        alert('Syllabus not available for download');
+      }
+    } catch (error) {
+      console.error('❌ Error downloading syllabus:', error);
+      alert('Failed to download syllabus. Please try again.');
     }
   };
 
@@ -106,14 +176,7 @@ const StudentRoadmap: React.FC = () => {
                 View Document
               </button>
               <button
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = completeSyllabus.pdfData;
-                  link.download = completeSyllabus.pdfFileName;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
+                onClick={() => handleDownloadSyllabus('COMPLETE_SYLLABUS')}
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
@@ -207,14 +270,7 @@ const StudentRoadmap: React.FC = () => {
                           View PDF
                         </button>
                         <button
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = syllabus.pdfData;
-                            link.download = syllabus.pdfFileName;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
+                          onClick={() => handleDownloadSyllabus(syllabus.electiveId)}
                           className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1"
                         >
                           <Download className="w-3 h-3" />

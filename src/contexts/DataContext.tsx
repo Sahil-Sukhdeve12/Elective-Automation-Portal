@@ -194,6 +194,105 @@ const fetchFeedbackTemplates = async () => {
   }
 };
 
+// API function to fetch ALL student elective selections (for admins)
+const fetchAllStudentSelections = async () => {
+  try {
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      console.log('❌ No auth token found, skipping selection fetch');
+      return [];
+    }
+
+    const apiUrl = `${getApiBaseUrl()}/student/all-selections`;
+    console.log('🔄 [ADMIN] Fetching ALL student selections from:', apiUrl);
+    console.log('📝 Using auth token:', authToken.substring(0, 20) + '...');
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('📡 Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Failed to fetch all student selections:', response.status, errorText);
+      console.error('❌ API URL was:', apiUrl);
+      
+      // If 403/401, user might not be admin - fallback to regular fetch
+      if (response.status === 403 || response.status === 401) {
+        console.log('⚠️ Not authorized for all selections, falling back to user selections');
+        return await fetchStudentSelections();
+      }
+      
+      return [];
+    }
+
+    const data = await response.json();
+    console.log('📊 [ADMIN] Raw API response:', data);
+    console.log('   ✓ Success:', data.success);
+    console.log('   ✓ Total selections across all students:', data.selections?.length || 0);
+    
+    if (data.success && data.selections) {
+      console.log('🔄 [ADMIN] Mapping', data.selections.length, 'selections to frontend format...');
+      
+      // Map backend selections to frontend format
+      const mappedSelections = data.selections.map((selection: any, index: number) => {
+        // electiveId is populated, so it's an object with _id, name, track, etc.
+        const electiveId = typeof selection.electiveId === 'object' 
+          ? (selection.electiveId._id || selection.electiveId.id)
+          : selection.electiveId;
+        
+        const track = typeof selection.electiveId === 'object'
+          ? (selection.electiveId.track || '')
+          : '';
+        
+        if (index < 3) { // Log first 3 for debugging
+          console.log(`   [${index + 1}/${data.selections.length}] Selection:`, {
+            _id: selection._id,
+            studentId: selection.studentId,
+            electiveId: electiveId,
+            electiveName: selection.electiveId?.name || 'Unknown',
+            track: track,
+            semester: selection.semester
+          });
+        }
+
+        return {
+          id: selection._id || selection.id,
+          studentId: selection.studentId,
+          electiveId: electiveId,
+          semester: selection.semester,
+          track: track,
+          category: selection.category || [],
+          status: selection.status || 'selected',
+          dateSelected: selection.selectedAt || selection.createdAt || new Date().toISOString()
+        };
+      });
+
+      console.log('✅ [ADMIN] Successfully mapped', mappedSelections.length, 'selections');
+      
+      // Group by student for debugging
+      const byStudent = mappedSelections.reduce((acc: any, sel: any) => {
+        acc[sel.studentId] = (acc[sel.studentId] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📊 [ADMIN] Selections by student count:', byStudent);
+      console.log('📊 [ADMIN] Total students with selections:', Object.keys(byStudent).length);
+      
+      return mappedSelections;
+    }
+    
+    console.log('⚠️ No selections found in API response');
+    return [];
+  } catch (error) {
+    console.error('❌ Error fetching all student selections:', error);
+    return [];
+  }
+};
+
 // API function to fetch student elective selections
 const fetchStudentSelections = async () => {
   try {
@@ -509,6 +608,7 @@ interface DataContextType {
   addElective: (elective: Omit<Elective, 'id'>) => Promise<boolean>;
   updateElective: (id: string, elective: Partial<Elective>) => Promise<boolean>;
   deleteElective: (id: string) => Promise<boolean>;
+  clearElectiveEnrollment: (id: string) => Promise<boolean>;
   refreshElectives: () => Promise<boolean>;
   refreshUsers: () => Promise<boolean>;
   refreshStudentSelections: () => Promise<boolean>;
@@ -547,7 +647,7 @@ interface DataContextType {
   submitFeedbackResponse: (response: Omit<FeedbackResponse, 'id' | 'submittedAt'>) => Promise<void>;
   getFeedbackResponses: (templateId?: string, studentId?: string) => FeedbackResponse[];
   getStudentSubmittedTemplates: (studentId: string) => string[];
-  deleteFeedbackResponse: (responseId: string) => void;
+  deleteFeedbackResponse: (responseId: string) => Promise<void>;
   // Syllabus management functions
   uploadSyllabus: (electiveId: string, file: File, description: string, targetDepartment?: string, targetSemester?: number) => Promise<boolean>;
   getSyllabus: (electiveId: string) => Syllabus | null;
@@ -1089,18 +1189,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const systemConfig = await systemConfigApi.getConfig();
         console.log('✅ Loaded system config from database:', systemConfig);
+        console.log('   📋 electiveCategories from database:', systemConfig.electiveCategories);
         
         if (systemConfig.departments && systemConfig.departments.length > 0) {
+          console.log('   ✅ Setting departments:', systemConfig.departments.length);
           setAdminDepartments(systemConfig.departments);
         }
         if (systemConfig.sections && systemConfig.sections.length > 0) {
+          console.log('   ✅ Setting sections:', systemConfig.sections.length);
           setAdminSections(systemConfig.sections);
         }
         if (systemConfig.semesters && systemConfig.semesters.length > 0) {
+          console.log('   ✅ Setting semesters:', systemConfig.semesters.length);
           setAdminSemesters(systemConfig.semesters);
         }
         if (systemConfig.electiveCategories && systemConfig.electiveCategories.length > 0) {
+          console.log('   ✅ Setting categories:', systemConfig.electiveCategories.length, systemConfig.electiveCategories);
           setAdminCategories(systemConfig.electiveCategories);
+        } else {
+          console.warn('   ⚠️ No electiveCategories found in database, using defaults');
         }
       } catch (error) {
         console.warn('⚠️ Could not load system config from database, using defaults:', error);
@@ -1194,9 +1301,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fetch student selections from backend (for logged-in students)
-      console.log('🔄 Fetching student selections from backend...');
-      const backendSelections = await fetchStudentSelections();
+      // Fetch student selections from backend
+      // Check if user is admin by decoding JWT token
+      const authToken = localStorage.getItem('authToken');
+      let isAdmin = false;
+      
+      if (authToken) {
+        try {
+          // Decode JWT token (simple base64 decode of payload)
+          const payload = JSON.parse(atob(authToken.split('.')[1]));
+          isAdmin = payload.role === 'admin';
+          console.log('👤 User role from token:', payload.role);
+        } catch (error) {
+          console.warn('⚠️ Could not decode auth token:', error);
+        }
+      }
+      
+      console.log('🔄 Fetching student selections from backend... (isAdmin:', isAdmin, ')');
+      
+      // If admin, fetch ALL selections; if student, fetch only their selections
+      const backendSelections = isAdmin 
+        ? await fetchAllStudentSelections()
+        : await fetchStudentSelections();
+        
       console.log('📊 Backend selections received:', backendSelections.length, backendSelections);
       
       if (backendSelections.length > 0) {
@@ -1511,6 +1638,43 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error deleting elective:', error);
+      return false;
+    }
+  };
+
+  const clearElectiveEnrollment = async (id: string): Promise<boolean> => {
+    try {
+      console.log('Clearing enrollment for elective:', id);
+      
+      // Clear enrollment via API
+      const response = await fetch(`${getApiBaseUrl()}/electives/${id}/clear-enrollment`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      console.log('Clear enrollment API response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Clear enrollment success:', data);
+        
+        // Update local state - set enrolledStudents to 0
+        const updatedElectives = electives.map(e => 
+          e.id === id ? { ...e, enrolledStudents: 0 } : e
+        );
+        setElectives(updatedElectives);
+        localStorage.setItem('electives', JSON.stringify(updatedElectives));
+        return true;
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Failed to clear enrollment:', errorData);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error clearing enrollment:', error);
       return false;
     }
   };
@@ -1959,16 +2123,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Category management functions
   const getAvailableCategories = (): string[] => {
-    // Extract unique categories from electives
-    const categories = new Set<string>();
-    electives.forEach(elective => {
-      if (Array.isArray(elective.category)) {
-        elective.category.forEach(cat => categories.add(cat));
-      } else if (elective.category) {
-        categories.add(elective.category);
-      }
-    });
-    return Array.from(categories);
+    console.log('📋 [getAvailableCategories] Called');
+    console.log('   adminCategories from state:', adminCategories);
+    console.log('   adminCategories count:', adminCategories.length);
+    
+    // Return adminCategories from system configuration (loaded from database)
+    // This is the source of truth for available categories
+    const categories = [...adminCategories];
+    
+    console.log('   ✅ Returning categories:', categories);
+    return categories;
   };
 
   const addCategory = async (category: string): Promise<boolean> => {
@@ -2551,10 +2715,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .map(response => response.templateId);
   };
 
-  const deleteFeedbackResponse = (responseId: string): void => {
-    const updatedResponses = feedbackResponses.filter(response => response.id !== responseId);
-    setFeedbackResponses(updatedResponses);
-    localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+  const deleteFeedbackResponse = async (responseId: string): Promise<void> => {
+    try {
+      console.log('🗑️ Deleting feedback response:', responseId);
+      
+      // Delete from database via API
+      const response = await fetch(`${getApiBaseUrl()}/feedback/responses/${responseId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      console.log('Delete feedback response API status:', response.status);
+      
+      if (response.ok) {
+        // Update local state
+        const updatedResponses = feedbackResponses.filter(r => r.id !== responseId);
+        setFeedbackResponses(updatedResponses);
+        localStorage.setItem('feedbackResponses', JSON.stringify(updatedResponses));
+        console.log('✅ Feedback response deleted successfully');
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('❌ Failed to delete feedback response:', errorData);
+      }
+    } catch (error) {
+      console.error('❌ Error deleting feedback response:', error);
+    }
   };
 
   // Get current enrollment count for an elective
@@ -2822,6 +3010,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addElective,
       updateElective,
       deleteElective,
+      clearElectiveEnrollment,
       removeElective,
       submitFeedback,
       refreshElectives,

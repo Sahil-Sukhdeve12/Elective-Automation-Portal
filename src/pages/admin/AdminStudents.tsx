@@ -1,12 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useData, Student } from '../../contexts/DataContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { Search, Download, Users, FileText, CheckCircle, Filter, X, RefreshCw } from 'lucide-react';
+import { Search, Download, Users, FileText, CheckCircle, Filter, X, RefreshCw, ChevronDown } from 'lucide-react';
 
 interface ReportFilters {
   department: string;
   semester: string;
-  section: string;
+  section: string | string[]; // Support both string and array for backward compatibility
   category: 'Departmental' | 'Open' | 'Humanities' | '';
   track: string;
   elective: string;
@@ -29,7 +29,11 @@ const AdminStudents: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [semesterFilter, setSemesterFilter] = useState('');
-  const [sectionFilter, setSectionFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState<string[]>([]); // Array for multi-select
+  const [sectionDropdownOpen, setSectionDropdownOpen] = useState(false); // Dropdown state
+  const sectionDropdownRef = useRef<HTMLDivElement>(null); // Ref for click outside
+  const [reportSectionDropdownOpen, setReportSectionDropdownOpen] = useState(false); // Report section dropdown
+  const reportSectionDropdownRef = useRef<HTMLDivElement>(null); // Ref for report section dropdown
   const [trackFilter, settrackFilter] = useState('');
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showAdvancedReport, setShowAdvancedReport] = useState(false);
@@ -42,6 +46,21 @@ const AdminStudents: React.FC = () => {
     track: '',
     elective: ''
   });
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sectionDropdownRef.current && !sectionDropdownRef.current.contains(event.target as Node)) {
+        setSectionDropdownOpen(false);
+      }
+      if (reportSectionDropdownRef.current && !reportSectionDropdownRef.current.contains(event.target as Node)) {
+        setReportSectionDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Get students from DataContext
   const allStudents: Student[] = students;
@@ -60,7 +79,7 @@ const AdminStudents: React.FC = () => {
       
       const matchesDepartment = !departmentFilter || student.department === departmentFilter;
       const matchesSemester = !semesterFilter || student.semester.toString() === semesterFilter;
-      const matchesSection = !sectionFilter || student.section === sectionFilter;
+      const matchesSection = sectionFilter.length === 0 || (student.section && sectionFilter.includes(student.section)); // Multi-select logic
       
       let matchestrack = true;
       if (trackFilter) {
@@ -75,13 +94,42 @@ const AdminStudents: React.FC = () => {
   }, [allStudents, searchTerm, departmentFilter, semesterFilter, sectionFilter, trackFilter, studentElectives]);
 
   const getStudentElectives = (studentId: string) => {
-    return studentElectives
-      .filter(se => se.studentId === studentId)
+    console.log('🔍 [AdminStudents] Getting electives for student:', studentId);
+    console.log('📊 [AdminStudents] Total studentElectives in context:', studentElectives.length);
+    console.log('📋 [AdminStudents] Sample studentElectives:', studentElectives.slice(0, 3));
+    
+    const filtered = studentElectives
+      .filter(se => {
+        const match = se.studentId === studentId;
+        if (!match && studentElectives.length > 0) {
+          console.log('❌ [AdminStudents] No match - Comparing:', { 
+            seStudentId: se.studentId, 
+            targetStudentId: studentId,
+            match 
+          });
+        }
+        return match;
+      })
       .map(se => {
         const elective = electives.find(e => e.id === se.electiveId);
+        if (!elective) {
+          console.warn('⚠️ [AdminStudents] Elective not found for electiveId:', se.electiveId);
+        }
         return { ...se, elective };
       })
       .sort((a, b) => a.semester - b.semester);
+    
+    console.log('✅ [AdminStudents] Filtered electives for student:', filtered.length);
+    if (filtered.length > 0) {
+      console.log('📝 [AdminStudents] First elective:', {
+        electiveId: filtered[0].electiveId,
+        electiveName: filtered[0].elective?.name,
+        semester: filtered[0].semester,
+        track: filtered[0].track
+      });
+    }
+    
+    return filtered;
   };
 
   const getStudenttracks = (studentId: string) => {
@@ -123,7 +171,13 @@ const AdminStudents: React.FC = () => {
     
     // Filter by section
     if (reportFilters.section) {
-      reportStudents = reportStudents.filter(s => s.section === reportFilters.section);
+      if (Array.isArray(reportFilters.section)) {
+        // Multi-select: filter by any of the selected sections
+        reportStudents = reportStudents.filter(s => s.section && reportFilters.section.includes(s.section));
+      } else {
+        // Single select (backward compatibility)
+        reportStudents = reportStudents.filter(s => s.section === reportFilters.section);
+      }
     }
     
     // Filter by category/track/elective
@@ -155,13 +209,24 @@ const AdminStudents: React.FC = () => {
   const generateReportData = () => {
     const reportStudents = getFilteredStudentsForReport();
     
+    console.log('📊 [Report] Generating report for', reportStudents.length, 'students');
+    console.log('📊 [Report] Total studentElectives available:', studentElectives.length);
+    
     return reportStudents.map(student => {
+      console.log('👤 [Report] Processing student:', student.name, 'ID:', student.id);
+      
       // Get student's electives
       const studentElectivesData = getStudentElectives(student.id);
+      console.log('📝 [Report] Student electives found:', studentElectivesData.length);
+      
       const electivesList = studentElectivesData.map(se => {
         const elective = electives.find(e => e.id === se.electiveId);
-        return elective ? `${elective.name} (${elective.code})` : 'Unknown';
+        const electiveName = elective ? `${elective.name} (${elective.code})` : 'Unknown';
+        console.log('  - Elective:', electiveName, 'ID:', se.electiveId);
+        return electiveName;
       }).join('; ');
+      
+      console.log('📋 [Report] Electives list for', student.name, ':', electivesList || 'No electives selected');
       
       // Get primary track (track with most electives)
       const primaryTrack = getPrimaryTrack(student.id);
@@ -187,7 +252,10 @@ const AdminStudents: React.FC = () => {
   // Enhanced export function for advanced reports
   const handleAdvancedExport = (format: 'excel' | 'pdf') => {
     const data = generateReportData();
-    const fileName = `students_report_${reportFilters.department || 'all-depts'}_${reportFilters.semester || 'all-sems'}_${reportFilters.section || 'all-sections'}_${reportFilters.category || 'all-categories'}_${new Date().toISOString().split('T')[0]}`;
+    const sectionStr = Array.isArray(reportFilters.section) 
+      ? (reportFilters.section.length > 0 ? reportFilters.section.join('-') : 'all-sections')
+      : (reportFilters.section || 'all-sections');
+    const fileName = `students_report_${reportFilters.department || 'all-depts'}_${reportFilters.semester || 'all-sems'}_${sectionStr}_${reportFilters.category || 'all-categories'}_${new Date().toISOString().split('T')[0]}`;
     
     if (format === 'excel') {
       const csvHeaders = Object.keys(data[0] || {}).join(',');
@@ -212,10 +280,13 @@ const AdminStudents: React.FC = () => {
       URL.revokeObjectURL(url);
     } else if (format === 'pdf') {
       const reportTitle = 'STUDENT ROSTER REPORT';
+      const sectionDisplay = Array.isArray(reportFilters.section)
+        ? (reportFilters.section.length > 0 ? `Sections: ${reportFilters.section.join(', ')}` : '')
+        : (reportFilters.section ? `Section: ${reportFilters.section}` : '');
       const filterInfo = [
         reportFilters.department && `Department: ${reportFilters.department}`,
         reportFilters.semester && `Semester: ${reportFilters.semester}`,
-        reportFilters.section && `Section: ${reportFilters.section}`
+        sectionDisplay
       ].filter(Boolean);
       
       const pdfContent = [
@@ -346,7 +417,7 @@ const AdminStudents: React.FC = () => {
     setSearchTerm('');
     setDepartmentFilter('');
     setSemesterFilter('');
-    setSectionFilter('');
+    setSectionFilter([]); // Clear array
     settrackFilter('');
   };
 
@@ -470,21 +541,59 @@ const AdminStudents: React.FC = () => {
             </select>
           </div>
 
-          <div>
+          <div ref={sectionDropdownRef} className="relative">
             <label htmlFor="section" className="block text-sm font-medium text-gray-700 mb-1">
               Section
             </label>
-            <select
-              id="section"
-              value={sectionFilter}
-              onChange={(e) => setSectionFilter(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            <button
+              type="button"
+              onClick={() => setSectionDropdownOpen(!sectionDropdownOpen)}
+              className="block w-full px-3 py-2 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-left flex justify-between items-center"
             >
-              <option value="">All Sections</option>
-              {sections.map(section => (
-                <option key={section} value={section}>Section {section}</option>
-              ))}
-            </select>
+              <span className={sectionFilter.length === 0 ? 'text-gray-500' : 'text-gray-900'}>
+                {sectionFilter.length === 0 
+                  ? 'All Sections' 
+                  : `${sectionFilter.length} selected: ${sectionFilter.join(', ')}`}
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${sectionDropdownOpen ? 'transform rotate-180' : ''}`} />
+            </button>
+            
+            {sectionDropdownOpen && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                <div className="p-2">
+                  <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sectionFilter.length === 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSectionFilter([]);
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900">All Sections</span>
+                  </label>
+                  {sections.map(section => (
+                    <label key={section} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sectionFilter.includes(section)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSectionFilter(prev => [...prev, section]);
+                          } else {
+                            setSectionFilter(prev => prev.filter(s => s !== section));
+                          }
+                        }}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">Section {section}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* <div>
@@ -635,10 +744,10 @@ const AdminStudents: React.FC = () => {
                       <span className="font-medium text-gray-900">{semesterFilter}</span>
                     </div>
                   )}
-                  {sectionFilter && (
+                  {sectionFilter.length > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Section:</span>
-                      <span className="font-medium text-gray-900">{sectionFilter}</span>
+                      <span className="text-gray-600">Sections:</span>
+                      <span className="font-medium text-gray-900">{sectionFilter.join(', ')}</span>
                     </div>
                   )}
                   {trackFilter && (
@@ -653,7 +762,7 @@ const AdminStudents: React.FC = () => {
                       <span className="font-medium text-gray-900">"{searchTerm}"</span>
                     </div>
                   )}
-                  {!departmentFilter && !semesterFilter && !sectionFilter && !trackFilter && !searchTerm && (
+                  {!departmentFilter && !semesterFilter && sectionFilter.length === 0 && !trackFilter && !searchTerm && (
                     <div className="text-gray-600 text-center">All students (no filters applied)</div>
                   )}
                 </div>
@@ -756,23 +865,67 @@ const AdminStudents: React.FC = () => {
                   </div>
 
                   {/* Section Filter */}
-                  <div>
+                  <div ref={reportSectionDropdownRef} className="relative">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Section Filter
                     </label>
-                    <select
-                      value={reportFilters.section}
-                      onChange={(e) => setReportFilters(prev => ({ 
-                        ...prev, 
-                        section: e.target.value
-                      }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <button
+                      type="button"
+                      onClick={() => setReportSectionDropdownOpen(!reportSectionDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-left flex justify-between items-center"
                     >
-                      <option value="">All Sections</option>
-                      {sections.map(section => (
-                        <option key={section} value={section}>Section {section}</option>
-                      ))}
-                    </select>
+                      <span className={!reportFilters.section || (Array.isArray(reportFilters.section) && reportFilters.section.length === 0) ? 'text-gray-500' : 'text-gray-900'}>
+                        {!reportFilters.section || (Array.isArray(reportFilters.section) && reportFilters.section.length === 0)
+                          ? 'All Sections' 
+                          : Array.isArray(reportFilters.section)
+                            ? `${reportFilters.section.length} selected: ${reportFilters.section.join(', ')}`
+                            : `Section ${reportFilters.section}`}
+                      </span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${reportSectionDropdownOpen ? 'transform rotate-180' : ''}`} />
+                    </button>
+                    
+                    {reportSectionDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        <div className="p-2">
+                          <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!reportFilters.section || (Array.isArray(reportFilters.section) && reportFilters.section.length === 0) || reportFilters.section === ''}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setReportFilters(prev => ({ ...prev, section: '' }));
+                                }
+                              }}
+                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-900">All Sections</span>
+                          </label>
+                          {sections.map(section => {
+                            const sectionsArray = Array.isArray(reportFilters.section) ? reportFilters.section : [];
+                            const isChecked = sectionsArray.includes(section);
+                            
+                            return (
+                              <label key={section} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const currentSections = Array.isArray(reportFilters.section) ? reportFilters.section : [];
+                                    if (e.target.checked) {
+                                      setReportFilters(prev => ({ ...prev, section: [...currentSections, section] }));
+                                    } else {
+                                      setReportFilters(prev => ({ ...prev, section: currentSections.filter(s => s !== section) }));
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-700">Section {section}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Category Filter */}
@@ -867,10 +1020,12 @@ const AdminStudents: React.FC = () => {
                       <span className="font-medium text-gray-900">Semester {reportFilters.semester}</span>
                     </div>
                   )}
-                  {reportFilters.section && (
+                  {reportFilters.section && (Array.isArray(reportFilters.section) ? reportFilters.section.length > 0 : reportFilters.section) && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Section:</span>
-                      <span className="font-medium text-gray-900">Section {reportFilters.section}</span>
+                      <span className="text-gray-600">Section{Array.isArray(reportFilters.section) && reportFilters.section.length > 1 ? 's' : ''}:</span>
+                      <span className="font-medium text-gray-900">
+                        {Array.isArray(reportFilters.section) ? reportFilters.section.join(', ') : `Section ${reportFilters.section}`}
+                      </span>
                     </div>
                   )}
                   {reportFilters.category && (
@@ -893,7 +1048,7 @@ const AdminStudents: React.FC = () => {
                       </span>
                     </div>
                   )}
-                  {!reportFilters.department && !reportFilters.semester && !reportFilters.section && !reportFilters.category && !reportFilters.track && !reportFilters.elective && (
+                  {!reportFilters.department && !reportFilters.semester && (!reportFilters.section || (Array.isArray(reportFilters.section) && reportFilters.section.length === 0)) && !reportFilters.category && !reportFilters.track && !reportFilters.elective && (
                     <div className="text-gray-600 text-center">All students (no filters applied)</div>
                   )}
                 </div>

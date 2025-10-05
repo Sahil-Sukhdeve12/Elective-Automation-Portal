@@ -78,6 +78,30 @@ router.post('/', auth, isAdmin, async (req, res) => {
   }
 });
 
+// Clear enrollment count (admin only) - MUST come before /:id routes
+router.put('/:id/clear-enrollment', auth, isAdmin, async (req, res) => {
+  try {
+    const elective = await Elective.findByIdAndUpdate(
+      req.params.id,
+      { enrolledStudents: 0 },
+      { new: true, runValidators: true }
+    );
+
+    if (!elective) {
+      return res.status(404).json({ message: 'Elective not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Enrollment cleared successfully',
+      elective
+    });
+  } catch (error) {
+    console.error('Clear enrollment error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Update elective (admin only)
 router.put('/:id', auth, isAdmin, async (req, res) => {
   try {
@@ -123,6 +147,90 @@ router.delete('/:id', auth, isAdmin, async (req, res) => {
 });
 
 // Select elective (student only)
+// Select an elective (student only) - NEW ENDPOINT to match frontend
+router.post('/select/:id', auth, isStudent, async (req, res) => {
+  try {
+    const electiveId = req.params.id;
+    const { studentId, semester } = req.body;
+
+    console.log('📥 Received elective selection request:', { 
+      electiveId, 
+      studentId, 
+      semester,
+      authenticatedUser: req.user.id 
+    });
+
+    // Check if elective exists and is active
+    const elective = await Elective.findById(electiveId);
+    if (!elective || !elective.isActive) {
+      console.log('❌ Elective not found or inactive:', electiveId);
+      return res.status(404).json({ 
+        success: false,
+        error: 'Elective not found or is not active' 
+      });
+    }
+
+    console.log('✅ Elective found:', elective.name, elective.code);
+
+    // Check deadline
+    if (elective.selectionDeadline && new Date() > elective.selectionDeadline) {
+      console.log('❌ Selection deadline passed for:', elective.name);
+      return res.status(400).json({ 
+        success: false,
+        error: 'Selection deadline has passed' 
+      });
+    }
+
+    // Check if student already selected this elective for this semester
+    // NOTE: Model uses 'student' and 'elective' fields, not 'studentId' and 'electiveId'
+    const existingSelection = await StudentElective.findOne({
+      student: studentId || req.user.id,
+      elective: electiveId,
+      semester: semester
+    });
+
+    if (existingSelection) {
+      console.log('⚠️ Student already selected this elective:', existingSelection);
+      return res.status(400).json({ 
+        success: false,
+        error: 'You have already selected this elective for this semester' 
+      });
+    }
+
+    console.log('✅ No existing selection found, proceeding to create new selection');
+
+    // Create selection using correct model field names
+    const studentElective = new StudentElective({
+      student: studentId || req.user.id,  // Uses 'student' not 'studentId'
+      elective: electiveId,  // Uses 'elective' not 'electiveId'
+      semester: semester,
+      track: elective.track,
+      status: 'selected',
+      selectedAt: new Date()
+    });
+
+    await studentElective.save();
+    console.log('✅ Selection saved to MongoDB:', studentElective);
+
+    // Populate the elective details before returning
+    await studentElective.populate('elective', 'name code credits track category');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Elective selected successfully',
+      selection: studentElective
+    });
+  } catch (error) {
+    console.error('❌ Select elective error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      details: error.message 
+    });
+  }
+});
+
+// Select an elective (student only) - ORIGINAL ENDPOINT
 router.post('/:id/select', auth, isStudent, async (req, res) => {
   try {
     const electiveId = req.params.id;

@@ -250,7 +250,7 @@ const AdminStudents: React.FC = () => {
         'Email': student.email,
         'Department': student.department,
         'Semester': student.semester,
-        'Section': student.section,
+        'Section': student.section || 'Not Assigned',
         'Primary Track': primaryTrack,
         'All Track(s)': studentTracks || 'No track selected',
         'Electives Selected': electivesList || 'No electives selected',

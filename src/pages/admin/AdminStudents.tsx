@@ -132,8 +132,13 @@ const AdminStudents: React.FC = () => {
     return filtered;
   };
 
-  const getStudenttracks = (studentId: string) => {
-    const studentElectivesData = getStudentElectives(studentId);
+  const getStudenttracks = (studentId: string, semester?: number) => {
+    const allElectives = getStudentElectives(studentId);
+    // Filter by semester if provided
+    const studentElectivesData = semester 
+      ? allElectives.filter(se => se.semester === semester)
+      : allElectives;
+      
     const trackCounts = studentElectivesData.reduce((acc: Record<string, number>, se) => {
       acc[se.track] = (acc[se.track] || 0) + 1;
       return acc;
@@ -146,8 +151,8 @@ const AdminStudents: React.FC = () => {
   };
 
   // Get primary track for a student (the track with most electives)
-  const getPrimaryTrack = (studentId: string): string => {
-    const tracks = getStudenttracks(studentId);
+  const getPrimaryTrack = (studentId: string, semester?: number): string => {
+    const tracks = getStudenttracks(studentId, semester);
     if (tracks.length === 0) return 'No track selected';
     
     // Sort by count descending and get the first one
@@ -215,23 +220,28 @@ const AdminStudents: React.FC = () => {
     return reportStudents.map(student => {
       console.log('👤 [Report] Processing student:', student.name, 'ID:', student.id);
       
-      // Get student's electives
-      const studentElectivesData = getStudentElectives(student.id);
-      console.log('📝 [Report] Student electives found:', studentElectivesData.length);
+      // Get student's electives - FILTERED BY STUDENT'S CURRENT SEMESTER
+      const allStudentElectives = getStudentElectives(student.id);
+      
+      // Filter electives to show only those for the student's current semester
+      const studentElectivesData = allStudentElectives.filter(se => se.semester === student.semester);
+      
+      console.log('📝 [Report] Student electives found (current semester):', studentElectivesData.length);
+      console.log('📝 [Report] All semesters electives:', allStudentElectives.length);
       
       const electivesList = studentElectivesData.map(se => {
         const elective = electives.find(e => e.id === se.electiveId);
         const electiveName = elective ? `${elective.name} (${elective.code})` : 'Unknown';
-        console.log('  - Elective:', electiveName, 'ID:', se.electiveId);
+        console.log('  - Elective:', electiveName, 'ID:', se.electiveId, 'Semester:', se.semester);
         return electiveName;
       }).join('; ');
       
       console.log('📋 [Report] Electives list for', student.name, ':', electivesList || 'No electives selected');
       
-      // Get primary track (track with most electives)
-      const primaryTrack = getPrimaryTrack(student.id);
+      // Get primary track (track with most electives) - only from current semester
+      const primaryTrack = getPrimaryTrack(student.id, student.semester);
       
-      // Get all student's tracks
+      // Get all student's tracks - only from current semester
       const studentTracks = [...new Set(studentElectivesData.map(se => se.track))].join('; ');
       
       return {

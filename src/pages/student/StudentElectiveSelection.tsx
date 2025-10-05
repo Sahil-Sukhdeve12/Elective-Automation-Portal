@@ -189,6 +189,16 @@ const StudentElectiveSelection: React.FC = () => {
   });
 
   const handleCategorySelect = (category: string) => {
+    // Check if total elective limit reached
+    if (selectedCategories.size >= totalElectiveLimit) {
+      addNotification({
+        type: 'error',
+        title: 'Selection Limit Reached',
+        message: `You have reached the maximum limit of ${totalElectiveLimit} electives for this semester.`
+      });
+      return;
+    }
+    
     if (!canSelectFromCategory(category)) {
       addNotification({
         type: 'warning',
@@ -204,6 +214,16 @@ const StudentElectiveSelection: React.FC = () => {
   const handleElectiveSelect = async (electiveId: string) => {
     const elective = electives.find(e => e.id === electiveId);
     if (!elective) return;
+
+    // Check if total elective limit reached
+    if (selectedCategories.size >= totalElectiveLimit) {
+      addNotification({
+        type: 'error',
+        title: 'Selection Limit Reached',
+        message: `You have reached the maximum limit of ${totalElectiveLimit} electives for this semester.`
+      });
+      return;
+    }
 
     // Check if already selected any category from this elective's categories
     const hasConflict = elective.category.some(cat => !canSelectFromCategory(cat));

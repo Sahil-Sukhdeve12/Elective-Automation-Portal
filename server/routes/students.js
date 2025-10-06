@@ -29,17 +29,24 @@ router.get('/selections', auth, isStudent, async (req, res) => {
     }
     
     // Map to match frontend expected format
-    const mappedSelections = selections.map(sel => ({
-      _id: sel._id,
-      studentId: sel.student,  // Map 'student' to 'studentId' for frontend
-      electiveId: sel.elective,  // This will be populated object
-      semester: sel.semester,
-      track: sel.track,
-      category: sel.elective?.category || [],
-      status: sel.status || 'selected',
-      selectedAt: sel.selectedAt,
-      createdAt: sel.createdAt
-    }));
+    const mappedSelections = selections.map(sel => {
+      // Extract ObjectId as string
+      const electiveId = typeof sel.elective === 'object' && sel.elective !== null
+        ? (sel.elective._id ? sel.elective._id.toString() : sel.elective.toString())
+        : sel.elective.toString();
+      
+      return {
+        _id: sel._id,
+        studentId: sel.student.toString(),  // Map 'student' to 'studentId' for frontend
+        electiveId: electiveId,  // Extract the actual ID from populated object
+        semester: sel.semester,
+        track: sel.track,
+        category: sel.elective?.category || [],
+        status: sel.status || 'selected',
+        selectedAt: sel.selectedAt,
+        createdAt: sel.createdAt
+      };
+    });
     
     res.json({
       success: true,
@@ -72,16 +79,23 @@ router.get('/selections/:studentId', auth, isAdmin, async (req, res) => {
     console.log('✅ Found', selections.length, 'selections');
     
     // Map to match frontend expected format
-    const mappedSelections = selections.map(sel => ({
-      _id: sel._id,
-      studentId: sel.student,
-      electiveId: sel.elective,
-      semester: sel.semester,
-      track: sel.track,
-      category: sel.elective?.category || [],
-      status: sel.status || 'selected',
-      selectedAt: sel.selectedAt
-    }));
+    const mappedSelections = selections.map(sel => {
+      // Extract ObjectId as string
+      const electiveId = typeof sel.elective === 'object' && sel.elective !== null
+        ? (sel.elective._id ? sel.elective._id.toString() : sel.elective.toString())
+        : sel.elective.toString();
+      
+      return {
+        _id: sel._id,
+        studentId: sel.student.toString(),
+        electiveId: electiveId,
+        semester: sel.semester,
+        track: sel.track,
+        category: sel.elective?.category || [],
+        status: sel.status || 'selected',
+        selectedAt: sel.selectedAt
+      };
+    });
     
     res.json({
       success: true,
@@ -106,23 +120,55 @@ router.get('/all-selections', auth, isAdmin, async (req, res) => {
     // Get all selections across all students
     const selections = await StudentElective.find({})
       .populate('elective', 'name code credits track category electiveCategory semester')
-      .populate('student', 'name email rollNumber department semester')
+      .populate('student', 'name email rollNumber department semester section')
       .sort({ student: 1, semester: 1, selectedAt: 1 });
 
     console.log('✅ Found', selections.length, 'total selections across all students');
     
+    if (selections.length > 0) {
+      console.log('📋 Sample selection (first one):');
+      console.log('  - student field type:', typeof selections[0].student);
+      console.log('  - student._id:', selections[0].student?._id);
+      console.log('  - elective field type:', typeof selections[0].elective);
+      console.log('  - elective._id:', selections[0].elective?._id);
+    }
+    
     // Map to match frontend expected format
-    const mappedSelections = selections.map(sel => ({
-      _id: sel._id,
-      studentId: sel.student?._id || sel.student,
-      electiveId: sel.elective,
-      semester: sel.semester,
-      track: sel.track,
-      category: sel.elective?.category || [],
-      status: sel.status || 'selected',
-      selectedAt: sel.selectedAt,
-      createdAt: sel.createdAt
-    }));
+    const mappedSelections = selections.map((sel, index) => {
+      // Extract the actual ObjectId strings from populated documents
+      const studentId = typeof sel.student === 'object' && sel.student !== null
+        ? (sel.student._id ? sel.student._id.toString() : sel.student.toString())
+        : sel.student.toString();
+      
+      const electiveId = typeof sel.elective === 'object' && sel.elective !== null
+        ? (sel.elective._id ? sel.elective._id.toString() : sel.elective.toString())
+        : sel.elective.toString();
+      
+      if (index < 3) {
+        console.log(`   [${index + 1}] Mapped selection:`, {
+          originalStudentId: sel.student,
+          mappedStudentId: studentId,
+          originalElectiveId: sel.elective,
+          mappedElectiveId: electiveId,
+          electiveName: sel.elective?.name,
+          track: sel.track
+        });
+      }
+      
+      return {
+        _id: sel._id,
+        studentId: studentId,
+        electiveId: electiveId,
+        semester: sel.semester,
+        track: sel.track,
+        category: sel.elective?.category || [],
+        status: sel.status || 'selected',
+        selectedAt: sel.selectedAt,
+        createdAt: sel.createdAt
+      };
+    });
+    
+    console.log('✅ Mapped', mappedSelections.length, 'selections successfully');
     
     res.json({
       success: true,

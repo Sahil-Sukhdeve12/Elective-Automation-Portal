@@ -21,12 +21,13 @@ router.get('/', auth, isAdmin, async (req, res) => {
     console.log(`📊 Total users: ${usersWithoutPassword.length}, Students: ${students.length}`);
     
     if (students.length > 0) {
-      console.log('🎓 Sample student data (first 3):');
+      console.log('🎓 Sample student data (first 3) WITH SECTION:');
       students.slice(0, 3).forEach(s => {
         console.log(`  - ${s.name}:`);
-        console.log(`    · section field exists: ${s.hasOwnProperty('section')}`);
         console.log(`    · section value: "${s.section}" (type: ${typeof s.section})`);
+        console.log(`    · section exists: ${s.hasOwnProperty('section')}`);
         console.log(`    · rollNumber: ${s.rollNumber}`);
+        console.log(`    · ALL KEYS:`, Object.keys(s));
       });
       
       const sectionCounts = students.reduce((acc, s) => {
@@ -35,6 +36,10 @@ router.get('/', auth, isAdmin, async (req, res) => {
         return acc;
       }, {});
       console.log('📈 Section distribution:', sectionCounts);
+      
+      // LOG THE EXACT JSON BEING SENT
+      console.log('\n📤 EXACT JSON being sent for first student:');
+      console.log(JSON.stringify(students[0], null, 2));
     }
 
     res.json({ users: usersWithoutPassword });

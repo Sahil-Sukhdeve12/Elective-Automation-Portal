@@ -62,6 +62,24 @@ const AdminStudents: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Debug: Log students data on mount and when it changes
+  useEffect(() => {
+    console.log('👥 [AdminStudents] Students loaded:', students.length);
+    console.log('📊 [AdminStudents] Section distribution:', 
+      students.reduce((acc: Record<string, number>, s) => {
+        const section = s.section || 'Not Assigned';
+        acc[section] = (acc[section] || 0) + 1;
+        return acc;
+      }, {})
+    );
+    
+    // Log first 3 students with their section data
+    console.log('📋 [AdminStudents] Sample students with sections:');
+    students.slice(0, 3).forEach(s => {
+      console.log(`  - ${s.name}: section = "${s.section}" (${typeof s.section})`);
+    });
+  }, [students]);
+
   // Get students from DataContext
   const allStudents: Student[] = students;
 
@@ -72,7 +90,19 @@ const AdminStudents: React.FC = () => {
   const categories = getAvailableCategories();
 
   const filteredStudents = useMemo(() => {
-    return allStudents.filter(student => {
+    console.log('🔍 [Filter] Filtering students...');
+    console.log('🔍 [Filter] sectionFilter:', sectionFilter);
+    console.log('🔍 [Filter] Total students:', allStudents.length);
+    
+    // Log section distribution
+    const sectionDist = allStudents.reduce((acc: Record<string, number>, s) => {
+      const section = s.section || 'undefined/null';
+      acc[section] = (acc[section] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('📊 [Filter] Section distribution in allStudents:', sectionDist);
+    
+    const filtered = allStudents.filter(student => {
       const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            student.rollNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            student.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -80,6 +110,11 @@ const AdminStudents: React.FC = () => {
       const matchesDepartment = !departmentFilter || student.department === departmentFilter;
       const matchesSemester = !semesterFilter || student.semester.toString() === semesterFilter;
       const matchesSection = sectionFilter.length === 0 || (student.section && sectionFilter.includes(student.section)); // Multi-select logic
+      
+      // Debug logging for section filter
+      if (sectionFilter.length > 0) {
+        console.log(`🔍 [Filter] Student: ${student.name}, section: "${student.section}", matchesSection: ${matchesSection}`);
+      }
       
       let matchestrack = true;
       if (trackFilter) {
@@ -91,29 +126,62 @@ const AdminStudents: React.FC = () => {
 
       return matchesSearch && matchesDepartment && matchesSemester && matchesSection && matchestrack;
     });
+    
+    console.log('✅ [Filter] Filtered students:', filtered.length);
+    if (sectionFilter.length > 0) {
+      const filteredSectionDist = filtered.reduce((acc: Record<string, number>, s) => {
+        const section = s.section || 'undefined/null';
+        acc[section] = (acc[section] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📊 [Filter] Section distribution in filtered results:', filteredSectionDist);
+    }
+    return filtered;
   }, [allStudents, searchTerm, departmentFilter, semesterFilter, sectionFilter, trackFilter, studentElectives]);
 
   const getStudentElectives = (studentId: string) => {
     console.log('🔍 [AdminStudents] Getting electives for student:', studentId);
     console.log('📊 [AdminStudents] Total studentElectives in context:', studentElectives.length);
-    console.log('📋 [AdminStudents] Sample studentElectives:', studentElectives.slice(0, 3));
+    
+    if (studentElectives.length > 0) {
+      console.log('📋 [AdminStudents] Sample studentElective (first one):', {
+        id: studentElectives[0].id,
+        studentId: studentElectives[0].studentId,
+        electiveId: studentElectives[0].electiveId,
+        track: studentElectives[0].track,
+        semester: studentElectives[0].semester
+      });
+      console.log('🎯 [AdminStudents] Looking for studentId:', studentId);
+      console.log('🎯 [AdminStudents] Type of target studentId:', typeof studentId);
+      console.log('🎯 [AdminStudents] Type of first se.studentId:', typeof studentElectives[0].studentId);
+    }
     
     const filtered = studentElectives
       .filter(se => {
-        const match = se.studentId === studentId;
+        // Ensure both IDs are strings for comparison
+        const seStudentId = String(se.studentId || '');
+        const targetStudentId = String(studentId || '');
+        const match = seStudentId === targetStudentId;
+        
         if (!match && studentElectives.length > 0) {
           console.log('❌ [AdminStudents] No match - Comparing:', { 
-            seStudentId: se.studentId, 
-            targetStudentId: studentId,
+            seStudentId, 
+            targetStudentId,
             match 
           });
         }
         return match;
       })
       .map(se => {
-        const elective = electives.find(e => e.id === se.electiveId);
+        const elective = electives.find(e => {
+          // Ensure both IDs are strings for comparison
+          const eId = String(e.id || '');
+          const seElectiveId = String(se.electiveId || '');
+          return eId === seElectiveId;
+        });
         if (!elective) {
           console.warn('⚠️ [AdminStudents] Elective not found for electiveId:', se.electiveId);
+          console.warn('   Available elective IDs:', electives.slice(0, 5).map(e => e.id));
         }
         return { ...se, elective };
       })
@@ -164,24 +232,39 @@ const AdminStudents: React.FC = () => {
   const getFilteredStudentsForReport = () => {
     let reportStudents = allStudents;
     
+    console.log('📊 [Report Filter] Starting with', reportStudents.length, 'students');
+    console.log('📊 [Report Filter] Report filters:', reportFilters);
+    
     // Filter by department
     if (reportFilters.department) {
       reportStudents = reportStudents.filter(s => s.department === reportFilters.department);
+      console.log('📊 [Report Filter] After department filter:', reportStudents.length);
     }
     
     // Filter by semester
     if (reportFilters.semester) {
       reportStudents = reportStudents.filter(s => s.semester.toString() === reportFilters.semester);
+      console.log('📊 [Report Filter] After semester filter:', reportStudents.length);
     }
     
     // Filter by section
     if (reportFilters.section) {
+      console.log('📊 [Report Filter] Section filter value:', reportFilters.section);
       if (Array.isArray(reportFilters.section)) {
         // Multi-select: filter by any of the selected sections
-        reportStudents = reportStudents.filter(s => s.section && reportFilters.section.includes(s.section));
+        const beforeCount = reportStudents.length;
+        reportStudents = reportStudents.filter(s => {
+          const hasSection = s.section && reportFilters.section.includes(s.section);
+          if (!hasSection) {
+            console.log(`❌ [Report Filter] Student ${s.name} (section: ${s.section}) excluded by section filter`);
+          }
+          return hasSection;
+        });
+        console.log(`📊 [Report Filter] After section filter: ${reportStudents.length} (filtered out ${beforeCount - reportStudents.length})`);
       } else {
         // Single select (backward compatibility)
         reportStudents = reportStudents.filter(s => s.section === reportFilters.section);
+        console.log('📊 [Report Filter] After section filter (single):', reportStudents.length);
       }
     }
     
@@ -205,8 +288,10 @@ const AdminStudents: React.FC = () => {
         
         return true;
       });
+      console.log('📊 [Report Filter] After category/track/elective filter:', reportStudents.length);
     }
     
+    console.log('📊 [Report Filter] Final filtered students:', reportStudents.length);
     return reportStudents;
   };
 
@@ -666,6 +751,9 @@ const AdminStudents: React.FC = () => {
                 </p>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Department:</span> {student.department}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Section:</span> {student.section || 'Not Assigned'}
                 </p>
                 <p className="text-sm text-gray-600">
                   <span className="font-medium">Electives Completed:</span> {studentElectivesData.length}

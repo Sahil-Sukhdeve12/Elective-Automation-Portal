@@ -86,6 +86,23 @@ const fetchUsers = async () => {
     
     const data = await response.json();
     console.log('✅ Users fetched successfully:', data.users?.length || 0);
+    
+    // Log section data for first 3 users
+    if (data.users && data.users.length > 0) {
+      console.log('🔍 [fetchUsers] RAW API Response - First 3 users:');
+      data.users.slice(0, 3).forEach((user: any) => {
+        console.log(`  - ${user.name}:`);
+        console.log(`    · section IN API RESPONSE: "${user.section}"`);
+        console.log(`    · section type: ${typeof user.section}`);
+        console.log(`    · Has section prop: ${Object.prototype.hasOwnProperty.call(user, 'section')}`);
+        console.log(`    · User object keys:`, Object.keys(user));
+      });
+      
+      // Log raw JSON of first user
+      console.log('📄 [fetchUsers] RAW JSON of first user:');
+      console.log(JSON.stringify(data.users[0], null, 2));
+    }
+    
     return data.users || [];
   } catch (error) {
     console.warn('Error fetching users (non-critical):', error instanceof Error ? error.message : 'Unknown error');
@@ -240,19 +257,29 @@ const fetchAllStudentSelections = async () => {
       
       // Map backend selections to frontend format
       const mappedSelections = data.selections.map((selection: any, index: number) => {
-        // electiveId is populated, so it's an object with _id, name, track, etc.
-        const electiveId = typeof selection.electiveId === 'object' 
-          ? (selection.electiveId._id || selection.electiveId.id)
-          : selection.electiveId;
+        // Handle both populated object and plain ObjectId string
+        let electiveId: string;
+        let track = '';
         
-        const track = typeof selection.electiveId === 'object'
-          ? (selection.electiveId.track || '')
-          : '';
+        if (typeof selection.electiveId === 'object' && selection.electiveId !== null) {
+          // electiveId is populated object
+          electiveId = selection.electiveId._id || selection.electiveId.id || selection.electiveId;
+          track = selection.electiveId.track || '';
+        } else {
+          // electiveId is already a string
+          electiveId = selection.electiveId;
+          track = selection.track || '';
+        }
+        
+        // Ensure studentId is a string
+        const studentId = typeof selection.studentId === 'object' && selection.studentId !== null
+          ? (selection.studentId._id || selection.studentId.id || selection.studentId.toString())
+          : (selection.studentId || '').toString();
         
         if (index < 3) { // Log first 3 for debugging
           console.log(`   [${index + 1}/${data.selections.length}] Selection:`, {
             _id: selection._id,
-            studentId: selection.studentId,
+            studentId: studentId,
             electiveId: electiveId,
             electiveName: selection.electiveId?.name || 'Unknown',
             track: track,
@@ -262,10 +289,10 @@ const fetchAllStudentSelections = async () => {
 
         return {
           id: selection._id || selection.id,
-          studentId: selection.studentId,
+          studentId: studentId,
           electiveId: electiveId,
           semester: selection.semester,
-          track: track,
+          track: track || selection.track || '',
           category: selection.category || [],
           status: selection.status || 'selected',
           dateSelected: selection.selectedAt || selection.createdAt || new Date().toISOString()
@@ -334,18 +361,28 @@ const fetchStudentSelections = async () => {
       
       // Map backend selections to frontend format
       const mappedSelections = data.selections.map((selection: any, index: number) => {
-        // electiveId is populated, so it's an object with _id, name, track, etc.
-        const electiveId = typeof selection.electiveId === 'object' 
-          ? (selection.electiveId._id || selection.electiveId.id)
-          : selection.electiveId;
+        // Handle both populated object and plain ObjectId string
+        let electiveId: string;
+        let track = '';
         
-        const track = typeof selection.electiveId === 'object'
-          ? (selection.electiveId.track || '')
-          : '';
+        if (typeof selection.electiveId === 'object' && selection.electiveId !== null) {
+          // electiveId is populated object
+          electiveId = selection.electiveId._id || selection.electiveId.id || selection.electiveId;
+          track = selection.electiveId.track || '';
+        } else {
+          // electiveId is already a string
+          electiveId = selection.electiveId;
+          track = selection.track || '';
+        }
+        
+        // Ensure studentId is a string
+        const studentId = typeof selection.studentId === 'object' && selection.studentId !== null
+          ? (selection.studentId._id || selection.studentId.id || selection.studentId.toString())
+          : (selection.studentId || '').toString();
         
         console.log(`   [${index + 1}/${data.selections.length}] Selection:`, {
           _id: selection._id,
-          studentId: selection.studentId,
+          studentId: studentId,
           electiveId: electiveId,
           electiveName: selection.electiveId?.name || 'Unknown',
           track: track,
@@ -355,10 +392,10 @@ const fetchStudentSelections = async () => {
 
         return {
           id: selection._id || selection.id,
-          studentId: selection.studentId,
+          studentId: studentId,
           electiveId: electiveId,
           semester: selection.semester,
-          track: track,
+          track: track || selection.track || '',
           category: selection.category || [],
           status: selection.status || 'selected',
           dateSelected: selection.selectedAt || selection.createdAt || new Date().toISOString()
@@ -1255,23 +1292,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Convert users to students format and store them
         const studentsData = backendUsers
           .filter((user: any) => user.role === 'student')
-          .map((user: any) => ({
-            id: user._id || user.id,
-            name: user.name,
-            rollNumber: user.rollNumber || user.rollNo,
-            email: user.email,
-            department: user.department,
-            yearOfStudy: Math.ceil((user.semester || 1) / 2),
-            semester: user.semester || 1,
-            section: user.section || 'A',
-            cgpa: user.cgpa || 0,
-            completedCredits: user.completedCredits || 0,
-            profile: user.preferences || {
-              interests: [],
-              careerGoals: [],
-              preferredLearningStyle: ''
-            }
-          }));
+          .map((user: any) => {
+            console.log(`🔄 [Initial Load] Mapping ${user.name}: section = "${user.section}" (${typeof user.section})`);
+            return {
+              id: user._id || user.id,
+              name: user.name,
+              rollNumber: user.rollNumber || user.rollNo,
+              email: user.email,
+              department: user.department,
+              yearOfStudy: Math.ceil((user.semester || 1) / 2),
+              semester: user.semester || 1,
+              section: user.section, // NO FALLBACK - use actual data
+              cgpa: user.cgpa || 0,
+              completedCredits: user.completedCredits || 0,
+              profile: user.preferences || {
+                interests: [],
+                careerGoals: [],
+                preferredLearningStyle: ''
+              }
+            };
+          });
+        
+        console.log('📊 [Initial Load] Section distribution:', 
+          studentsData.reduce((acc: Record<string, number>, s) => {
+            const section = s.section || 'undefined/null';
+            acc[section] = (acc[section] || 0) + 1;
+            return acc;
+          }, {})
+        );
         
         setStudents(studentsData);
         localStorage.setItem('students', JSON.stringify(studentsData));
@@ -1873,12 +1921,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Get available sections from admin-configured data first, then fallback to students data
   const getAvailableSections = (): string[] => {
+    console.log('🔍 [getAvailableSections] adminSections:', adminSections);
+    
     if (adminSections.length > 0) {
+      console.log('✅ [getAvailableSections] Using admin-configured sections:', adminSections);
       return adminSections.sort();
     }
     
+    // Get sections from the students state (not localStorage users)
+    console.log('📊 [getAvailableSections] Getting sections from students state...');
+    console.log('📊 [getAvailableSections] Total students:', students.length);
+    
+    const sectionsFromStudents = [...new Set(students.map((s: any) => s.section))].filter(Boolean) as string[];
+    console.log('📊 [getAvailableSections] Sections from students:', sectionsFromStudents);
+    
+    if (sectionsFromStudents.length > 0) {
+      return sectionsFromStudents.sort();
+    }
+    
+    // Fallback to localStorage users
     const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const sections = [...new Set(users.filter((u: any) => u.role === 'student').map((s: any) => s.section))] as string[];
+    const sections = [...new Set(users.filter((u: any) => u.role === 'student').map((s: any) => s.section))].filter(Boolean) as string[];
+    console.log('📊 [getAvailableSections] Sections from localStorage users:', sections);
+    
     return sections.filter((section: string) => section && section.trim() !== '').sort();
   };
 
@@ -2893,7 +2958,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUsers = async (): Promise<boolean> => {
     try {
+      console.log('🔄 Refreshing users from backend...');
       const refreshedUsers = await fetchUsers();
+      console.log('📦 Received users:', refreshedUsers.length);
+      
       if (refreshedUsers.length >= 0) {
         // Update localStorage since users don't have React state
         localStorage.setItem('users', JSON.stringify(refreshedUsers));
@@ -2901,15 +2969,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Update students state if we have it
         const studentsData = refreshedUsers
           .filter((user: any) => user.role === 'student')
-          .map((user: any) => ({
-            id: user._id || user.id,
-            name: user.name,
-            rollNumber: user.rollNumber || user.rollNo,
-            email: user.email,
-            department: user.department,
-            semester: user.semester,
-            section: user.section
-          }));
+          .map((user: any) => {
+            console.log(`  📝 Mapping student: ${user.name} - Section: ${user.section || '❌ MISSING'}`);
+            return {
+              id: user._id || user.id,
+              name: user.name,
+              rollNumber: user.rollNumber || user.rollNo,
+              email: user.email,
+              department: user.department,
+              semester: user.semester,
+              section: user.section
+            };
+          });
+        
+        console.log('✅ Mapped students:', studentsData.length);
+        console.log('📊 Section distribution:', 
+          studentsData.reduce((acc: any, s: any) => {
+            const section = s.section || 'Not Assigned';
+            acc[section] = (acc[section] || 0) + 1;
+            return acc;
+          }, {})
+        );
+        
         setStudents(studentsData);
         localStorage.setItem('students', JSON.stringify(studentsData));
         

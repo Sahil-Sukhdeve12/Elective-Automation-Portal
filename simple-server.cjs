@@ -877,11 +877,15 @@ app.get('/api/users', async (req, res) => {
         rollNumber: user.rollNumber,
         department: user.department,
         semester: user.semester,
+        section: user.section, // ✅ FIXED: Added section field
+        mobile: user.mobile,
+        profile: user.profile,
+        preferences: user.preferences,
         createdAt: user.createdAt
       }))
     });
   } catch (error) {
-    
+    console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
@@ -2677,7 +2681,8 @@ async function initializeDatabase() {
 }
 
 app.listen(PORT, async () => {
-  
+  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`📡 API endpoint: http://localhost:${PORT}/api`);
   await initializeDatabase();
 });
 

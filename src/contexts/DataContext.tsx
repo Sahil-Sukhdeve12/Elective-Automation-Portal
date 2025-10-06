@@ -628,6 +628,7 @@ interface DataContextType {
   studentElectives: StudentElective[];
   students: Student[];
   electiveFeedbacks: ElectiveFeedbackForm[];
+  isLoadingStudentData: boolean; // NEW: Loading state for students and their electives
   getElectivesByCategoryAndDepartment: (category: string, department?: string, semester?: number) => Elective[];
   getStudentElectives: (studentId: string) => StudentElective[];
   selectElective: (studentId: string, electiveId: string, semester: number) => Promise<boolean>;
@@ -1203,6 +1204,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [students, setStudents] = useState<Student[]>([]);
   const [studentElectives, setStudentElectives] = useState<StudentElective[]>([]);
   const [electiveFeedbacks, setElectiveFeedbacks] = useState<ElectiveFeedbackForm[]>([]);
+  const [isLoadingStudentData, setIsLoadingStudentData] = useState<boolean>(true); // NEW: Loading state
   
   // Admin-configured data - will be loaded from database
   const [adminDepartments, setAdminDepartments] = useState<string[]>([]);
@@ -1251,8 +1253,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Keep the default values already set in state
       }
       
-      // Fetch electives from backend
-      const backendElectives = await fetchElectives();
+      // OPTIMIZATION: Fetch data in parallel for faster loading
+      const [backendElectives, backendTracks, backendUsers, backendSyllabi] = await Promise.all([
+        fetchElectives(),
+        fetchTracks(),
+        fetchUsers(),
+        fetchSyllabi()
+      ]);
+      
+      // Process electives
       if (backendElectives.length > 0) {
         console.log('✅ Loaded electives from backend:', backendElectives.length);
         setElectives(backendElectives);
@@ -1268,8 +1277,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fetch tracks from backend
-      const backendTracks = await fetchTracks();
+      // Process tracks
       if (backendTracks.length > 0) {
         console.log('✅ Loaded tracks from backend:', backendTracks.length);
         setTracks(backendTracks);
@@ -1285,8 +1293,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fetch users from backend  
-      const backendUsers = await fetchUsers();
+      // Process users (already fetched in parallel above)
       if (backendUsers.length > 0) {
         console.log('✅ Loaded users from backend:', backendUsers.length);
         // Convert users to students format and store them
@@ -1331,8 +1338,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Fetch syllabi from MongoDB
-      const backendSyllabi = await fetchSyllabi();
+      // Process syllabi (already fetched in parallel above)
       if (backendSyllabi.length > 0) {
         console.log('✅ Loaded syllabi from MongoDB:', backendSyllabi.length);
         setSyllabi(backendSyllabi);
@@ -1433,6 +1439,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('❌ No feedback responses found in localStorage either');
         }
       }
+      
+      // All student data loaded - set loading to false
+      console.log('✅ Student data loading complete');
+      setIsLoadingStudentData(false);
     };
 
     loadData();
@@ -3088,6 +3098,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       students,
       studentElectives,
       electiveFeedbacks,
+      isLoadingStudentData,
       addElective,
       updateElective,
       deleteElective,

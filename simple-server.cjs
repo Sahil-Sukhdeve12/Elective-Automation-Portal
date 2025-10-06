@@ -1328,7 +1328,24 @@ app.get('/api/student/selections', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       count: selections.length,
-      selections: selections
+      selections: selections.map(selection => {
+        // Extract IDs as strings and track from populated elective
+        const electiveId = selection.electiveId?._id 
+          ? selection.electiveId._id.toString() 
+          : (selection.electiveId || '').toString();
+        const track = selection.electiveId?.track || '';
+        
+        return {
+          _id: selection._id.toString(),
+          studentId: selection.studentId,
+          electiveId: electiveId,
+          semester: selection.semester,
+          track: track,
+          category: selection.category,
+          status: selection.status,
+          selectedAt: selection.selectedAt || selection.createdAt
+        };
+      })
     });
   } catch (error) {
     
@@ -1361,21 +1378,33 @@ app.get('/api/student/all-selections', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       count: selections.length,
-      selections: selections.map(selection => ({
-        _id: selection._id,
-        studentId: selection.studentId?._id || selection.studentId,
-        electiveId: selection.electiveId,
-        semester: selection.semester,
-        category: selection.category,
-        status: selection.status,
-        selectedAt: selection.selectedAt || selection.createdAt,
-        studentName: selection.studentId?.name,
-        studentEmail: selection.studentId?.email,
-        studentRollNumber: selection.studentId?.rollNumber,
-        studentDepartment: selection.studentId?.department,
-        studentSemester: selection.studentId?.semester,
-        studentSection: selection.studentId?.section
-      }))
+      selections: selections.map(selection => {
+        // Extract IDs as strings
+        const studentId = selection.studentId?._id 
+          ? selection.studentId._id.toString() 
+          : (selection.studentId || '').toString();
+        const electiveId = selection.electiveId?._id 
+          ? selection.electiveId._id.toString() 
+          : (selection.electiveId || '').toString();
+        const track = selection.electiveId?.track || '';
+        
+        return {
+          _id: selection._id.toString(),
+          studentId: studentId,
+          electiveId: electiveId,
+          semester: selection.semester,
+          track: track, // ✅ Added track field from populated elective
+          category: selection.category,
+          status: selection.status,
+          selectedAt: selection.selectedAt || selection.createdAt,
+          studentName: selection.studentId?.name,
+          studentEmail: selection.studentId?.email,
+          studentRollNumber: selection.studentId?.rollNumber,
+          studentDepartment: selection.studentId?.department,
+          studentSemester: selection.studentId?.semester,
+          studentSection: selection.studentId?.section
+        };
+      })
     });
   } catch (error) {
     

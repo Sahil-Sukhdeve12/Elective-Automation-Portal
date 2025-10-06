@@ -17,7 +17,8 @@ const AdminStudents: React.FC = () => {
     electives, 
     tracks, 
     students,
-    studentElectives, 
+    studentElectives,
+    isLoadingStudentData, // NEW: Loading state
     getAvailableDepartments,
     getAvailableSections,
     getAvailableSemesters,
@@ -548,39 +549,48 @@ const AdminStudents: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Student Management</h1>
-          <p className="text-gray-600 mt-2">
-            View and manage student profiles and elective selections
-          </p>
+      {/* Loading State - Show spinner until student data and electives are loaded */}
+      {isLoadingStudentData ? (
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Student Data...</h2>
+          <p className="text-gray-600">Please wait while we fetch student information and electives</p>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Refresh student data"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </button>
-          <button
-            onClick={() => setShowExportDialog(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Basic Report
-          </button>
-          <button
-            onClick={() => setShowAdvancedReport(true)}
-            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            Advanced Report
-          </button>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Student Management</h1>
+              <p className="text-gray-600 mt-2">
+                View and manage student profiles and elective selections
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh student data"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={() => setShowExportDialog(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Basic Report
+              </button>
+              <button
+                onClick={() => setShowAdvancedReport(true)}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Advanced Report
+              </button>
+            </div>
+          </div>
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow-sm border mb-8">
@@ -1196,6 +1206,8 @@ const AdminStudents: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

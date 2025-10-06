@@ -9,7 +9,7 @@ const router = express.Router();
 // Register user
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role, department, semester, rollNumber, rollNo } = req.body;
+    const { name, email, password, role, department, semester, rollNumber, rollNo, section, mobile, registrationNumber } = req.body;
 
     console.log('📝 Registration attempt:', { 
       email, 
@@ -17,11 +17,14 @@ router.post('/register', async (req, res) => {
       rollNumber, 
       rollNo, 
       department, 
-      semester 
+      semester,
+      section,
+      mobile,
+      registrationNumber
     });
 
-    // Use rollNumber if provided, otherwise fallback to rollNo
-    const finalRollNumber = rollNumber || rollNo;
+    // Use rollNumber if provided, otherwise fallback to rollNo or registrationNumber
+    const finalRollNumber = rollNumber || rollNo || registrationNumber;
 
     // Validate required fields
     if (!name || !email || !password) {
@@ -62,7 +65,9 @@ router.post('/register', async (req, res) => {
       role,
       rollNumber: role === 'student' ? finalRollNumber : undefined,
       department: role === 'student' ? department : undefined,
-      semester: role === 'student' ? semester : undefined
+      semester: role === 'student' ? semester : undefined,
+      section: role === 'student' ? section : undefined,
+      mobile: mobile || undefined
     });
 
     await user.save();
@@ -85,6 +90,9 @@ router.post('/register', async (req, res) => {
         role: user.role,
         department: user.department,
         semester: user.semester,
+        section: user.section,
+        mobile: user.mobile,
+        rollNumber: user.rollNumber,
         isNewUser: user.isNewUser
       }
     });
@@ -128,6 +136,9 @@ router.post('/login', async (req, res) => {
         role: user.role,
         department: user.department,
         semester: user.semester,
+        section: user.section,
+        mobile: user.mobile,
+        rollNumber: user.rollNumber,
         isNewUser: user.isNewUser,
         preferences: user.preferences
       }
@@ -150,6 +161,9 @@ router.get('/me', auth, async (req, res) => {
         role: user.role,
         department: user.department,
         semester: user.semester,
+        section: user.section,
+        mobile: user.mobile,
+        rollNumber: user.rollNumber,
         isNewUser: user.isNewUser,
         preferences: user.preferences
       }

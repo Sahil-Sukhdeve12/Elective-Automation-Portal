@@ -9,10 +9,35 @@ const router = express.Router();
 router.get('/', auth, isAdmin, async (req, res) => {
   try {
     const users = await User.find({})
-      .select('-password') // Exclude password field
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json({ users });
+    // Manually remove password field from each user
+    const usersWithoutPassword = users.map(({ password, ...user }) => user);
+
+    // Debug: Log section data for students
+    const students = usersWithoutPassword.filter(u => u.role === 'student');
+    console.log('\n🔍 [/api/users] Fetching users...');
+    console.log(`📊 Total users: ${usersWithoutPassword.length}, Students: ${students.length}`);
+    
+    if (students.length > 0) {
+      console.log('🎓 Sample student data (first 3):');
+      students.slice(0, 3).forEach(s => {
+        console.log(`  - ${s.name}:`);
+        console.log(`    · section field exists: ${s.hasOwnProperty('section')}`);
+        console.log(`    · section value: "${s.section}" (type: ${typeof s.section})`);
+        console.log(`    · rollNumber: ${s.rollNumber}`);
+      });
+      
+      const sectionCounts = students.reduce((acc, s) => {
+        const section = s.section || 'UNDEFINED';
+        acc[section] = (acc[section] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('📈 Section distribution:', sectionCounts);
+    }
+
+    res.json({ users: usersWithoutPassword });
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ message: 'Internal server error' });

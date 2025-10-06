@@ -7,6 +7,15 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
+  },
   server: {
     // Only use proxy in development
     ...(process.env.NODE_ENV !== 'production' && {
@@ -22,3 +31,4 @@ export default defineConfig({
     }),
   },
 });
+

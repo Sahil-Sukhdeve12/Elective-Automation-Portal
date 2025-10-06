@@ -23,20 +23,20 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
-  console.log(`🌐 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+  
   if (req.headers.authorization) {
-    console.log('🔑 Authorization header present');
+    
   } else {
-    console.log('❌ No authorization header');
+    
   }
   next();
 });
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI).then(() => {
-  console.log('✅ Connected to MongoDB Atlas');
+  
 }).catch((error) => {
-  console.error('❌ MongoDB connection error:', error);
+  
 });
 
 // User schema
@@ -268,7 +268,7 @@ const FeedbackResponse = mongoose.model('FeedbackResponse', feedbackResponseSche
 const createEmailTransporter = () => {
   // Check if email is configured
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    console.warn('⚠️ Email not configured. Email notifications will be disabled.');
+    
     return null;
   }
 
@@ -295,7 +295,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    console.log('🔐 Login attempt:', email);
+    
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -303,15 +303,15 @@ app.post('/api/auth/login', async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      console.log('❌ User not found:', email);
+      
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    console.log('👤 Found user:', { email: user.email, role: user.role });
+    
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
-      console.log('❌ Invalid password for:', email);
+      
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -321,7 +321,7 @@ app.post('/api/auth/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    console.log('✅ Login successful:', email);
+    
 
     res.json({
       message: 'Login successful',
@@ -340,7 +340,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
+    
     res.status(500).json({ error: 'Internal server error during login' });
   }
 });
@@ -350,28 +350,15 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password, role, department, semester, registrationNumber, mobile, section } = req.body;
 
-    console.log('📝 Registration attempt:', { 
-      email, 
-      role, 
-      department, 
-      semester,
-      registrationNumber,
-      mobile,
-      section,
-      body: req.body 
-    });
+    
 
     if (!name || !email || !password) {
-      console.log('❌ Missing required fields:', { name: !!name, email: !!email, password: !!password });
+      
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
     if (role === 'student' && (!department || !semester || !registrationNumber)) {
-      console.log('❌ Missing student fields:', { 
-        department: !!department, 
-        semester: !!semester,
-        registrationNumber: !!registrationNumber
-      });
+      
       return res.status(400).json({ 
         error: 'Department, semester, and class roll number are required for students' 
       });
@@ -379,7 +366,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('❌ User already exists:', email);
+      
       return res.status(400).json({ error: 'Email already exists' });
     }
 
@@ -387,7 +374,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (role === 'student' && registrationNumber) {
       const existingRegNumber = await User.findOne({ rollNumber: registrationNumber });
       if (existingRegNumber) {
-        console.log('❌ Class roll number already exists:', registrationNumber);
+        
         return res.status(400).json({ error: 'Class roll number already exists' });
       }
     }
@@ -408,7 +395,7 @@ app.post('/api/auth/register', async (req, res) => {
     });
 
     await newUser.save();
-    console.log('✅ User created successfully:', { email, registrationNumber });
+    
 
     const token = jwt.sign(
       { userId: newUser._id, role: newUser.role },
@@ -432,7 +419,7 @@ app.post('/api/auth/register', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Registration error:', error);
+    
     res.status(500).json({ error: 'Internal server error during registration' });
   }
 });
@@ -548,9 +535,9 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
       try {
         await emailTransporter.sendMail(mailOptions);
-        console.log('✅ Password reset email sent to:', email);
+        
       } catch (emailError) {
-        console.error('❌ Failed to send reset email:', emailError);
+        
         return res.status(500).json({ 
           success: false, 
           message: 'Failed to send reset email. Please try again later.' 
@@ -558,14 +545,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       }
     } else {
       // Email not configured - log token to console for manual password reset
-      console.log('\n' + '='.repeat(80));
-      console.log('📧 EMAIL NOT CONFIGURED - MANUAL PASSWORD RESET REQUIRED');
-      console.log('='.repeat(80));
-      console.log(`User: ${user.name} (${email})`);
-      console.log(`Reset URL: ${resetUrl}`);
-      console.log(`\n⚠️  Copy the URL above and send it to the user manually`);
-      console.log(`⏰  Link expires in 30 minutes\n`);
-      console.log('='.repeat(80) + '\n');
+      
+      
+      
+      
+      
+      
+      
+      
     }
 
     res.status(200).json({ 
@@ -574,7 +561,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Forgot password error:', error);
+    
     res.status(500).json({ 
       success: false, 
       message: 'An error occurred. Please try again later.' 
@@ -643,7 +630,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     // Delete all reset tokens for this user
     await PasswordResetToken.deleteMany({ userId: user._id });
 
-    console.log('✅ Password reset successful for user:', user.email);
+    
 
     // Send confirmation email
     if (emailTransporter) {
@@ -699,9 +686,9 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
       try {
         await emailTransporter.sendMail(mailOptions);
-        console.log('✅ Password change confirmation email sent to:', user.email);
+        
       } catch (emailError) {
-        console.error('❌ Failed to send confirmation email:', emailError);
+        
         // Don't fail the request if confirmation email fails
       }
     }
@@ -712,7 +699,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Reset password error:', error);
+    
     res.status(500).json({ 
       success: false, 
       message: 'An error occurred. Please try again later.' 
@@ -761,7 +748,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching user profile:', error);
+    
     res.status(500).json({ error: 'Failed to fetch user profile' });
   }
 });
@@ -769,16 +756,16 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // Get user profile
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
-    console.log('🔧 Profile GET request received');
-    console.log('🔧 User from token:', req.user);
+    
+    
     
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) {
-      console.log('❌ User not found with ID:', req.user.userId);
+      
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log('✅ Profile fetched for user:', user.email);
+    
 
     res.json({
       id: user._id,
@@ -794,7 +781,7 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
       preferences: user.preferences
     });
   } catch (error) {
-    console.error('❌ Profile fetch error:', error);
+    
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -802,8 +789,8 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
 // Update user profile
 app.put('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
-    console.log('🔧 Profile update request received:', req.body);
-    console.log('🔧 User from token:', req.user);
+    
+    
     
     const { 
       name, 
@@ -836,7 +823,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
       if (profile.interests !== undefined) updateData['profile.interests'] = profile.interests;
     }
 
-    console.log('🔧 Update data:', updateData);
+    
 
     const user = await User.findByIdAndUpdate(
       req.user.userId,
@@ -845,11 +832,11 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     ).select('-password');
 
     if (!user) {
-      console.log('❌ User not found with ID:', req.user.userId);
+      
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log('✅ Profile updated successfully for user:', user.email);
+    
 
     res.json({
       message: 'Profile updated successfully',
@@ -869,7 +856,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Profile update error:', error);
+    
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -878,7 +865,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
 app.get('/api/users', async (req, res) => {
   try {
     const users = await User.find({}, '-password').sort({ createdAt: -1 });
-    console.log('👥 Found users:', users.length);
+    
     res.json({
       success: true,
       count: users.length,
@@ -894,7 +881,7 @@ app.get('/api/users', async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
+    
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
@@ -925,7 +912,7 @@ app.delete('/api/auth/users/:id', authenticateToken, async (req, res) => {
       await StudentElective.deleteMany({ studentId: id });
     }
 
-    console.log('✅ User deleted successfully:', deletedUser._id);
+    
 
     res.json({
       success: true,
@@ -933,7 +920,7 @@ app.delete('/api/auth/users/:id', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Delete user error:', error);
+    
     res.status(500).json({
       error: 'Failed to delete user',
       details: error.message
@@ -944,13 +931,13 @@ app.delete('/api/auth/users/:id', authenticateToken, async (req, res) => {
 // Get all electives
 app.get('/api/electives', async (req, res) => {
   try {
-    console.log('📚 Fetching electives...');
+    
     const electives = await Elective.find({});
-    console.log(`✅ Found ${electives.length} electives`);
+    
     
     // Log categories of all electives
     electives.forEach((elective, index) => {
-      console.log(`Elective ${index + 1}: ${elective.name} - category: ${elective.category}, electiveCategory: ${elective.electiveCategory}`);
+      
     });
     
     // Add deadline status to each elective
@@ -973,7 +960,7 @@ app.get('/api/electives', async (req, res) => {
       electives: electivesWithStatus
     });
   } catch (error) {
-    console.error('❌ Error fetching electives:', error);
+    
     res.status(500).json({ error: 'Failed to fetch electives' });
   }
 });
@@ -986,11 +973,11 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    console.log('🔥 Creating new elective:', req.body);
-    console.log('📋 Category value:', req.body.category);
-    console.log('📋 ElectiveCategory value:', req.body.electiveCategory);
-    console.log('📋 SubjectType value:', req.body.subjectType);
-    console.log('📋 Course code value:', JSON.stringify(req.body.code));
+    
+    
+    
+    
+    
     
     const {
       name,
@@ -1014,11 +1001,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       maxEnrollment
     } = req.body;
 
-    console.log('📥 Received create data:', {
-      minEnrollment,
-      maxEnrollment,
-      deadline: deadline || selectionDeadline
-    });
+    
 
     // Sanitize course code - convert null, "null", "undefined", empty string to undefined
     let sanitizedCode = undefined;
@@ -1030,7 +1013,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       }
     }
     
-    console.log('📋 Sanitized course code:', sanitizedCode === undefined ? 'undefined (will not be saved)' : sanitizedCode);
+    
 
     // Create new elective
     const newElective = new Elective({
@@ -1059,15 +1042,11 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
     });
 
     const savedElective = await newElective.save();
-    console.log('✅ Elective created successfully:', savedElective._id);
-    console.log('✅ Saved category:', savedElective.category);
-    console.log('✅ Saved electiveCategory:', savedElective.electiveCategory);
-    console.log('✅ Saved subjectType:', savedElective.subjectType);
-    console.log('💾 Saved enrollment values:', {
-      minEnrollment: savedElective.minEnrollment,
-      maxEnrollment: savedElective.maxEnrollment,
-      deadline: savedElective.deadline
-    });
+    
+    
+    
+    
+    
     
     res.status(201).json({
       success: true,
@@ -1075,7 +1054,7 @@ app.post('/api/electives', authenticateToken, async (req, res) => {
       elective: savedElective
     });
   } catch (error) {
-    console.error('❌ Error creating elective:', error);
+    
     
     // Handle duplicate key error specifically
     if (error.code === 11000) {
@@ -1117,7 +1096,7 @@ app.put('/api/electives/:id/clear-enrollment', authenticateToken, async (req, re
     }
 
     const { id } = req.params;
-    console.log('🔄 Clearing enrollment for elective:', id);
+    
     
     const elective = await Elective.findByIdAndUpdate(
       id,
@@ -1132,14 +1111,14 @@ app.put('/api/electives/:id/clear-enrollment', authenticateToken, async (req, re
       });
     }
 
-    console.log('✅ Enrollment cleared successfully:', elective._id);
+    
     res.json({
       success: true,
       message: 'Enrollment cleared successfully',
       elective: elective
     });
   } catch (error) {
-    console.error('❌ Error clearing enrollment:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to clear enrollment',
@@ -1157,18 +1136,9 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
     }
 
     const { id } = req.params;
-    console.log('🔄 Updating elective:', id);
-    console.log('📥 Full request body:', req.body);
-    console.log('📥 Received update data:', {
-      minEnrollment: req.body.minEnrollment,
-      maxEnrollment: req.body.maxEnrollment,
-      deadline: req.body.deadline,
-      types: {
-        minEnrollment: typeof req.body.minEnrollment,
-        maxEnrollment: typeof req.body.maxEnrollment,
-        deadline: typeof req.body.deadline
-      }
-    });
+    
+    
+    
     
     // Build update object, excluding undefined values
     const updateData = {};
@@ -1190,12 +1160,8 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
     });
     updateData.updatedAt = new Date();
     
-    console.log('📝 Processed update data:', updateData);
-    console.log('📝 Enrollment values in update:', {
-      minEnrollment: updateData.minEnrollment,
-      maxEnrollment: updateData.maxEnrollment,
-      deadline: updateData.deadline
-    });
+    
+    
     
     const updatedElective = await Elective.findByIdAndUpdate(
       id,
@@ -1210,12 +1176,8 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ Elective updated successfully:', updatedElective._id);
-    console.log('💾 Saved values:', {
-      minEnrollment: updatedElective.minEnrollment,
-      maxEnrollment: updatedElective.maxEnrollment,
-      deadline: updatedElective.deadline
-    });
+    
+    
     
     res.json({
       success: true,
@@ -1223,7 +1185,7 @@ app.put('/api/electives/:id', authenticateToken, async (req, res) => {
       elective: updatedElective
     });
   } catch (error) {
-    console.error('❌ Error updating elective:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to update elective',
@@ -1241,7 +1203,7 @@ app.delete('/api/electives/:id', authenticateToken, async (req, res) => {
     }
 
     const { id } = req.params;
-    console.log('🗑️ Deleting elective:', id);
+    
     
     const deletedElective = await Elective.findByIdAndDelete(id);
 
@@ -1252,13 +1214,13 @@ app.delete('/api/electives/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ Elective deleted successfully:', deletedElective._id);
+    
     res.json({
       success: true,
       message: 'Elective deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Error deleting elective:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to delete elective',
@@ -1324,7 +1286,7 @@ app.post('/api/electives/select/:id', authenticateToken, async (req, res) => {
     elective.enrolledStudents = (elective.enrolledStudents || 0) + 1;
     await elective.save();
 
-    console.log(`✅ Student ${studentId} selected elective ${elective.name} for semester ${semester || elective.semester}`);
+    
     
     res.json({
       success: true,
@@ -1333,7 +1295,7 @@ app.post('/api/electives/select/:id', authenticateToken, async (req, res) => {
       selection: selection
     });
   } catch (error) {
-    console.error('❌ Error selecting elective:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to select elective',
@@ -1357,7 +1319,7 @@ app.get('/api/student/selections', authenticateToken, async (req, res) => {
       .populate('electiveId')
       .sort({ semester: 1, selectedAt: -1 });
     
-    console.log(`📚 Found ${selections.length} elective selections for student ${studentId}`);
+    
     
     res.json({
       success: true,
@@ -1365,7 +1327,7 @@ app.get('/api/student/selections', authenticateToken, async (req, res) => {
       selections: selections
     });
   } catch (error) {
-    console.error('❌ Error fetching student selections:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch selections',
@@ -1390,7 +1352,7 @@ app.get('/api/student/all-selections', authenticateToken, async (req, res) => {
       .populate('studentId', 'name email rollNumber department semester section')
       .sort({ semester: 1, selectedAt: -1 });
     
-    console.log(`📚 Admin retrieved ${selections.length} total elective selections from MongoDB`);
+    
     
     res.json({
       success: true,
@@ -1412,7 +1374,7 @@ app.get('/api/student/all-selections', authenticateToken, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Error fetching all student selections:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch all selections',
@@ -1449,7 +1411,7 @@ app.put('/api/student/track', authenticateToken, async (req, res) => {
     
     await user.save();
     
-    console.log(`✅ Updated track for student ${studentId} to ${track}`);
+    
     
     res.json({
       success: true,
@@ -1457,7 +1419,7 @@ app.put('/api/student/track', authenticateToken, async (req, res) => {
       track: track
     });
   } catch (error) {
-    console.error('❌ Error updating student track:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to update track',
@@ -1471,9 +1433,9 @@ app.put('/api/student/track', authenticateToken, async (req, res) => {
 // Get all tracks
 app.get('/api/tracks', async (req, res) => {
   try {
-    console.log('🎯 Fetching tracks from database...');
+    
     const tracks = await Track.find({});
-    console.log(`✅ Found ${tracks.length} tracks`);
+    
     
     res.json({
       success: true,
@@ -1481,7 +1443,7 @@ app.get('/api/tracks', async (req, res) => {
       tracks: tracks
     });
   } catch (error) {
-    console.error('❌ Error fetching tracks:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch tracks' 
@@ -1498,7 +1460,7 @@ app.post('/api/tracks', authenticateToken, async (req, res) => {
 
     const { name, department, category, description, credits } = req.body;
     
-    console.log('📝 Creating new track:', { name, department, category });
+    
 
     const track = new Track({
       name,
@@ -1509,7 +1471,7 @@ app.post('/api/tracks', authenticateToken, async (req, res) => {
     });
 
     await track.save();
-    console.log('✅ Track created successfully:', track._id);
+    
 
     res.status(201).json({
       success: true,
@@ -1517,7 +1479,7 @@ app.post('/api/tracks', authenticateToken, async (req, res) => {
       track: track
     });
   } catch (error) {
-    console.error('❌ Error creating track:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to create track',
@@ -1536,7 +1498,7 @@ app.put('/api/tracks/:id', authenticateToken, async (req, res) => {
     const trackId = req.params.id;
     const updates = req.body;
 
-    console.log('🔄 Updating track:', trackId);
+    
 
     const track = await Track.findByIdAndUpdate(
       trackId,
@@ -1551,7 +1513,7 @@ app.put('/api/tracks/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ Track updated successfully');
+    
 
     res.json({
       success: true,
@@ -1559,7 +1521,7 @@ app.put('/api/tracks/:id', authenticateToken, async (req, res) => {
       track: track
     });
   } catch (error) {
-    console.error('❌ Error updating track:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to update track',
@@ -1576,7 +1538,7 @@ app.delete('/api/tracks/:id', authenticateToken, async (req, res) => {
     }
 
     const trackId = req.params.id;
-    console.log('🗑️ Deleting track:', trackId);
+    
 
     const track = await Track.findByIdAndDelete(trackId);
 
@@ -1587,14 +1549,14 @@ app.delete('/api/tracks/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ Track deleted successfully');
+    
 
     res.json({
       success: true,
       message: 'Track deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Error deleting track:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to delete track',
@@ -1611,7 +1573,7 @@ app.delete('/api/tracks/:id', authenticateToken, async (req, res) => {
 app.get('/api/feedback/templates', async (req, res) => {
   try {
     const templates = await FeedbackTemplate.find().sort({ createdAt: -1 });
-    console.log(`✅ Retrieved ${templates.length} feedback templates`);
+    
     
     res.json({
       success: true,
@@ -1621,7 +1583,7 @@ app.get('/api/feedback/templates', async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Error fetching feedback templates:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feedback templates',
@@ -1651,7 +1613,7 @@ app.post('/api/feedback/templates', authenticateToken, async (req, res) => {
       isActive
     } = req.body;
 
-    console.log('📝 Creating feedback template:', { title, questionCount: questions?.length, targetCategory });
+    
 
     // Validate required fields
     if (!title || !questions || questions.length === 0) {
@@ -1688,7 +1650,7 @@ app.post('/api/feedback/templates', authenticateToken, async (req, res) => {
     const newTemplate = new FeedbackTemplate(templateObj);
 
     const savedTemplate = await newTemplate.save();
-    console.log('✅ Feedback template created successfully:', savedTemplate._id);
+    
 
     res.status(201).json({
       success: true,
@@ -1699,7 +1661,7 @@ app.post('/api/feedback/templates', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error creating feedback template:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to create feedback template',
@@ -1721,7 +1683,7 @@ app.put('/api/feedback/templates/:id', authenticateToken, async (req, res) => {
     const templateId = req.params.id;
     const updates = req.body;
 
-    console.log('🔄 Updating feedback template:', templateId);
+    
 
     const template = await FeedbackTemplate.findByIdAndUpdate(
       templateId,
@@ -1736,7 +1698,7 @@ app.put('/api/feedback/templates/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('✅ Feedback template updated successfully');
+    
 
     res.json({
       success: true,
@@ -1747,7 +1709,7 @@ app.put('/api/feedback/templates/:id', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error updating feedback template:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to update feedback template',
@@ -1767,7 +1729,7 @@ app.delete('/api/feedback/templates/:id', authenticateToken, async (req, res) =>
     }
 
     const templateId = req.params.id;
-    console.log('🗑️ Deleting feedback template:', templateId);
+    
 
     const template = await FeedbackTemplate.findByIdAndDelete(templateId);
 
@@ -1778,14 +1740,14 @@ app.delete('/api/feedback/templates/:id', authenticateToken, async (req, res) =>
       });
     }
 
-    console.log('✅ Feedback template deleted successfully');
+    
 
     res.json({
       success: true,
       message: 'Feedback template deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Error deleting feedback template:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to delete feedback template',
@@ -1809,7 +1771,7 @@ app.get('/api/feedback/responses', authenticateToken, async (req, res) => {
     const query = templateId ? { templateId } : {};
     const responses = await FeedbackResponse.find(query).sort({ submittedAt: -1 });
     
-    console.log(`✅ Retrieved ${responses.length} feedback responses`);
+    
 
     res.json({
       success: true,
@@ -1819,7 +1781,7 @@ app.get('/api/feedback/responses', authenticateToken, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Error fetching feedback responses:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to fetch feedback responses',
@@ -1849,7 +1811,7 @@ app.post('/api/feedback/responses', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log('📝 Submitting feedback response:', { templateId, userId: user._id });
+    
 
     // Check if user already submitted this feedback
     const existing = await FeedbackResponse.findOne({
@@ -1878,7 +1840,7 @@ app.post('/api/feedback/responses', authenticateToken, async (req, res) => {
     });
 
     const savedResponse = await newResponse.save();
-    console.log('✅ Feedback response submitted successfully:', savedResponse._id);
+    
 
     res.status(201).json({
       success: true,
@@ -1889,7 +1851,7 @@ app.post('/api/feedback/responses', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error submitting feedback response:', error);
+    
     
     // Handle duplicate submission error
     if (error.code === 11000) {
@@ -1918,7 +1880,7 @@ app.delete('/api/feedback/responses/:id', authenticateToken, async (req, res) =>
     }
 
     const { id } = req.params;
-    console.log('🗑️ Deleting feedback response:', id);
+    
     
     const deletedResponse = await FeedbackResponse.findByIdAndDelete(id);
 
@@ -1929,13 +1891,13 @@ app.delete('/api/feedback/responses/:id', authenticateToken, async (req, res) =>
       });
     }
 
-    console.log('✅ Feedback response deleted successfully:', deletedResponse._id);
+    
     res.json({
       success: true,
       message: 'Feedback response deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Error deleting feedback response:', error);
+    
     res.status(500).json({ 
       success: false,
       error: 'Failed to delete feedback response',
@@ -1952,7 +1914,7 @@ app.get('/api/system-config', async (req, res) => {
     
     // If no config exists, build it from actual database data
     if (!config) {
-      console.log('⚙️ No system config found, building from database data...');
+      
       
       // Get unique departments from students and electives
       const students = await User.find({ role: 'student' });
@@ -1976,12 +1938,7 @@ app.get('/api/system-config', async (req, res) => {
         electiveCategories: categories.length > 0 ? categories : ['Professional Elective', 'Open Elective']
       });
       await config.save();
-      console.log('✅ Created system configuration from database:', {
-        departments: config.departments,
-        semesters: config.semesters,
-        sections: config.sections,
-        categories: config.electiveCategories
-      });
+      
     }
 
     res.json({
@@ -1994,7 +1951,7 @@ app.get('/api/system-config', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching system config:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to fetch system configuration'
@@ -2026,7 +1983,7 @@ app.put('/api/system-config', authenticateToken, async (req, res) => {
     config.updatedAt = new Date();
     await config.save();
 
-    console.log('✅ System configuration updated');
+    
 
     res.json({
       success: true,
@@ -2039,7 +1996,7 @@ app.put('/api/system-config', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error updating system config:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to update system configuration'
@@ -2099,7 +2056,7 @@ app.post('/api/syllabi', authenticateToken, async (req, res) => {
 
     await newSyllabus.save();
 
-    console.log(`✅ Syllabus uploaded for elective ${electiveId}`);
+    
 
     res.status(201).json({
       success: true,
@@ -2120,7 +2077,7 @@ app.post('/api/syllabi', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error uploading syllabus:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to upload syllabus'
@@ -2149,13 +2106,13 @@ app.get('/api/syllabi', async (req, res) => {
       isActive: syllabus.isActive
     }));
 
-    console.log(`✅ Retrieved ${formattedSyllabi.length} active syllabi`);
+    
 
     res.json({
       syllabi: formattedSyllabi
     });
   } catch (error) {
-    console.error('❌ Error fetching syllabi:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to fetch syllabi'
@@ -2177,7 +2134,7 @@ app.get('/api/syllabi/elective/:electiveId', async (req, res) => {
       });
     }
 
-    console.log(`✅ Retrieved syllabus for elective ${electiveId}`);
+    
 
     res.json({
       syllabus: {
@@ -2196,7 +2153,7 @@ app.get('/api/syllabi/elective/:electiveId', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching syllabus:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to fetch syllabus'
@@ -2227,7 +2184,7 @@ app.put('/api/syllabi/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`✅ Syllabus ${id} updated`);
+    
 
     res.json({
       success: true,
@@ -2248,7 +2205,7 @@ app.put('/api/syllabi/:id', authenticateToken, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error updating syllabus:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to update syllabus'
@@ -2274,14 +2231,14 @@ app.delete('/api/syllabi/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`✅ Syllabus ${id} deleted`);
+    
 
     res.json({
       success: true,
       message: 'Syllabus deleted successfully'
     });
   } catch (error) {
-    console.error('❌ Error deleting syllabus:', error);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to delete syllabus'
@@ -2310,7 +2267,7 @@ app.post('/api/notifications/send-email', authenticateToken, async (req, res) =>
 
     // Check if email is configured
     if (!emailTransporter) {
-      console.warn('⚠️ Email not configured, simulating email send');
+      
       return res.json({
         success: true,
         sentCount: recipients.length,
@@ -2375,17 +2332,17 @@ app.post('/api/notifications/send-email', authenticateToken, async (req, res) =>
           `
         });
         sentCount++;
-        console.log(`✅ Email sent to ${recipient.email}`);
+        
       } catch (emailError) {
         failedCount++;
         failedEmails.push(recipient.email);
-        console.error(`❌ Failed to send email to ${recipient.email}:`, emailError.message);
+        
       }
     }
 
     const responseMessage = `Email sent to ${sentCount} recipient(s).${failedCount > 0 ? ` Failed to send to ${failedCount} recipient(s).` : ''}`;
     
-    console.log(`📧 Email notification completed: ${sentCount} sent, ${failedCount} failed`);
+    
 
     res.json({
       success: true,
@@ -2395,7 +2352,7 @@ app.post('/api/notifications/send-email', authenticateToken, async (req, res) =>
       failedEmails: failedCount > 0 ? failedEmails : undefined
     });
   } catch (error) {
-    console.error('❌ Error sending email notification:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Failed to send email notification',
@@ -2438,7 +2395,7 @@ app.post('/api/notifications/send-to-users', authenticateToken, async (req, res)
 
     // Check if email is configured
     if (!emailTransporter) {
-      console.warn('⚠️ Email not configured, simulating email send');
+      
       return res.json({
         success: true,
         sentCount: recipients.length,
@@ -2476,11 +2433,11 @@ app.post('/api/notifications/send-to-users', authenticateToken, async (req, res)
         sentCount++;
       } catch (emailError) {
         failedCount++;
-        console.error(`❌ Failed to send email to ${recipient.email}:`, emailError.message);
+        
       }
     }
 
-    console.log(`📧 Emails sent to users: ${sentCount} sent, ${failedCount} failed`);
+    
 
     res.json({
       success: true,
@@ -2489,7 +2446,7 @@ app.post('/api/notifications/send-to-users', authenticateToken, async (req, res)
       message: `Email sent to ${sentCount} user(s).${failedCount > 0 ? ` Failed to send to ${failedCount}.` : ''}`
     });
   } catch (error) {
-    console.error('❌ Error sending emails to users:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Failed to send emails to users',
@@ -2549,14 +2506,14 @@ app.post('/api/notifications/test-email', authenticateToken, async (req, res) =>
       `
     });
 
-    console.log(`✅ Test email sent to ${recipientEmail}`);
+    
 
     res.json({
       success: true,
       message: 'Test email sent successfully! Please check the inbox.'
     });
   } catch (error) {
-    console.error('❌ Error sending test email:', error);
+    
     res.status(500).json({
       success: false,
       message: 'Failed to send test email',
@@ -2575,7 +2532,7 @@ app.get('/api/elective-limits', authenticateToken, async (req, res) => {
     const limits = await ElectiveLimit.find({ isActive: true }).sort({ department: 1, semester: 1, category: 1 });
     res.json({ success: true, limits });
   } catch (error) {
-    console.error('Error fetching elective limits:', error);
+    
     res.status(500).json({ success: false, error: 'Failed to fetch elective limits' });
   }
 });
@@ -2598,7 +2555,7 @@ app.get('/api/elective-limits/:department/:semester/:category', authenticateToke
       found: !!limit
     });
   } catch (error) {
-    console.error('Error fetching elective limit:', error);
+    
     res.status(500).json({ success: false, error: 'Failed to fetch elective limit' });
   }
 });
@@ -2635,7 +2592,7 @@ app.post('/api/elective-limits', authenticateToken, async (req, res) => {
       res.json({ success: true, limit: newLimit, created: true });
     }
   } catch (error) {
-    console.error('Error saving elective limit:', error);
+    
     res.status(500).json({ success: false, error: 'Failed to save elective limit' });
   }
 });
@@ -2658,7 +2615,7 @@ app.put('/api/elective-limits/:id', authenticateToken, async (req, res) => {
     
     res.json({ success: true, limit });
   } catch (error) {
-    console.error('Error updating elective limit:', error);
+    
     res.status(500).json({ success: false, error: 'Failed to update elective limit' });
   }
 });
@@ -2670,7 +2627,7 @@ app.delete('/api/elective-limits/:id', authenticateToken, async (req, res) => {
     await ElectiveLimit.findByIdAndDelete(id);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting elective limit:', error);
+    
     res.status(500).json({ success: false, error: 'Failed to delete elective limit' });
   }
 });
@@ -2694,9 +2651,9 @@ async function initializeDatabase() {
     const adminExists = await User.findOne({ role: 'admin' });
     
     if (!adminExists) {
-      console.log('\n' + '='.repeat(80));
-      console.log('🔧 FIRST TIME SETUP - Creating default admin account');
-      console.log('='.repeat(80));
+      
+      
+      
       
       // Create default admin
       const hashedPassword = await bcrypt.hash('admin123', 10);
@@ -2708,19 +2665,19 @@ async function initializeDatabase() {
         createdAt: new Date()
       });
       
-      console.log('✅ Default admin created successfully!\n');
-      console.log('📧 Email: admin@college.edu');
-      console.log('🔑 Password: admin123');
-      console.log('\n⚠️  IMPORTANT: Change this password after first login!');
-      console.log('='.repeat(80) + '\n');
+      
+      
+      
+      
+      
     }
   } catch (error) {
-    console.error('❌ Database initialization error:', error);
+    
   }
 }
 
 app.listen(PORT, async () => {
-  console.log(`🚀 Authentication server running on port ${PORT}`);
+  
   await initializeDatabase();
 });
 

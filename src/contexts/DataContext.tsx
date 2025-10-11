@@ -1295,8 +1295,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Process users (already fetched in parallel above)
+      console.log('📥 [loadData] Processing users from backend...');
+      console.log('   - backendUsers length:', backendUsers.length);
+      
       if (backendUsers.length > 0) {
-        console.log('✅ Loaded users from backend:', backendUsers.length);
+        console.log('✅ [loadData] Loaded users from backend:', backendUsers.length);
+        
+        // Log first user for debugging
+        if (backendUsers[0]) {
+          console.log('   📋 Sample user (first):', {
+            id: backendUsers[0]._id || backendUsers[0].id,
+            name: backendUsers[0].name,
+            role: backendUsers[0].role,
+            department: backendUsers[0].department,
+            section: backendUsers[0].section,
+            semester: backendUsers[0].semester
+          });
+        }
+        
         // Convert users to students format and store them
         const studentsData = backendUsers
           .filter((user: any) => user.role === 'student')
@@ -1321,6 +1337,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
           });
         
+        console.log('📊 [loadData] Converted students data:', studentsData.length);
         console.log('📊 [Initial Load] Section distribution:', 
           studentsData.reduce((acc: Record<string, number>, s) => {
             const section = s.section || 'undefined/null';
@@ -1329,13 +1346,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }, {})
         );
         
+        console.log('💾 [loadData] Saving students to state and localStorage...');
         setStudents(studentsData);
         localStorage.setItem('students', JSON.stringify(studentsData));
+        console.log('✅ [loadData] Students saved! State should now have', studentsData.length, 'students');
       } else {
+        console.warn('⚠️ [loadData] No users from backend, checking localStorage...');
         // Load from localStorage if backend fails
         const storedStudents = localStorage.getItem('students');
         if (storedStudents) {
-          setStudents(JSON.parse(storedStudents));
+          const parsed = JSON.parse(storedStudents);
+          console.log('📦 [loadData] Loaded students from localStorage:', parsed.length);
+          setStudents(parsed);
+        } else {
+          console.error('❌ [loadData] No students in localStorage either!');
+          console.error('❌ [loadData] Students array will be EMPTY');
         }
       }
 
@@ -1357,46 +1382,82 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Fetch student selections from backend
-      // Check if user is admin by decoding JWT token
-      const authToken = localStorage.getItem('authToken');
-      let isAdmin = false;
-      
-      if (authToken) {
+      // FIRST: Always try to load from localStorage for instant display
+      const storedSelections = localStorage.getItem('studentElectives');
+      if (storedSelections) {
         try {
-          // Decode JWT token (simple base64 decode of payload)
-          const payload = JSON.parse(atob(authToken.split('.')[1]));
-          isAdmin = payload.role === 'admin';
-          console.log('👤 User role from token:', payload.role);
+          const parsedSelections = JSON.parse(storedSelections);
+          console.log('⚡ [loadData] INSTANT LOAD from cache:', parsedSelections.length, 'selections');
+          setStudentElectives(parsedSelections);
+          setIsLoadingStudentData(false); // Data available immediately!
         } catch (error) {
-          console.warn('⚠️ Could not decode auth token:', error);
+          console.warn('⚠️ [loadData] Could not parse cached selections:', error);
         }
       }
       
-      console.log('🔄 Fetching student selections from backend... (isAdmin:', isAdmin, ')');
+      // THEN: Check if we can refresh from backend
+      const authToken = localStorage.getItem('authToken');
+      console.log('🔑 [loadData] Checking auth token for backend sync...');
+      console.log('   - Token exists:', !!authToken);
+      
+      if (!authToken) {
+        console.warn('⚠️ [loadData] No auth token - using cached data only');
+        console.warn('💡 Login to sync latest data from server');
+        // Already loaded from cache above, so we're done
+        return;
+      }
+      
+      let isAdmin = false;
+      
+      try {
+        // Decode JWT token (simple base64 decode of payload)
+        const payload = JSON.parse(atob(authToken.split('.')[1]));
+        isAdmin = payload.role === 'admin';
+        console.log('👤 [loadData] Decoded user role:', payload.role);
+        console.log('   - Is Admin:', isAdmin);
+        console.log('   - User ID:', payload.userId);
+      } catch (error) {
+        console.error('⚠️ [loadData] Could not decode auth token:', error);
+        // Use cached data if token is invalid
+        return;
+      }
+      
+      console.log('🔄 [loadData] Syncing student selections from backend...');
+      console.log('   - isAdmin:', isAdmin);
+      console.log('   - API endpoint:', isAdmin ? '/api/student/all-selections' : '/api/student/selections');
       
       // If admin, fetch ALL selections; if student, fetch only their selections
       const backendSelections = isAdmin 
         ? await fetchAllStudentSelections()
         : await fetchStudentSelections();
         
-      console.log('📊 Backend selections received:', backendSelections.length, backendSelections);
+      console.log('📊 [loadData] Backend selections received:', backendSelections.length);
+      if (backendSelections.length > 0) {
+        console.log('   ✅ Sample selection:', {
+          id: backendSelections[0].id,
+          studentId: backendSelections[0].studentId,
+          electiveId: backendSelections[0].electiveId,
+          semester: backendSelections[0].semester
+        });
+      }
       
       if (backendSelections.length > 0) {
-        console.log('✅ Loaded student selections from backend:', backendSelections.length);
+        console.log('✅ [loadData] Setting studentElectives in state:', backendSelections.length);
         setStudentElectives(backendSelections);
         // Save to localStorage for persistence
         localStorage.setItem('studentElectives', JSON.stringify(backendSelections));
-        console.log('💾 Saved selections to localStorage');
+        console.log('💾 [loadData] Saved selections to localStorage');
       } else {
-        console.log('⚠️ No selections from backend, checking localStorage...');
+        console.log('⚠️ [loadData] No selections from backend, checking localStorage...');
         // Fallback to localStorage if API fails or returns empty
         const storedSelections = localStorage.getItem('studentElectives');
         if (storedSelections) {
           const parsedSelections = JSON.parse(storedSelections);
-          console.log('📦 Loaded student selections from localStorage:', parsedSelections.length, parsedSelections);
+          console.log('📦 [loadData] Loaded from localStorage:', parsedSelections.length);
           setStudentElectives(parsedSelections);
         } else {
-          console.log('❌ No selections found in localStorage either');
+          console.log('❌ [loadData] No selections found in localStorage either');
+          console.log('❌ [loadData] studentElectives will remain empty: []');
         }
       }
 
@@ -1821,23 +1882,51 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getStudentElectives = (studentId: string): StudentElective[] => {
-    console.log('🔍 Getting electives for student:', studentId);
+    console.log('🔍 [getStudentElectives] Getting electives for student:', studentId);
     console.log('   📊 Total studentElectives in state:', studentElectives.length);
-    console.log('   📋 All student IDs in electives:', [...new Set(studentElectives.map(se => se.studentId))]);
+    
+    if (studentElectives.length === 0) {
+      console.warn('   ⚠️ studentElectives array is EMPTY!');
+      console.warn('   💡 Check if data loaded from backend or localStorage');
+      console.warn('   � Check browser console for auth token errors');
+      return [];
+    }
+    
+    // Get all unique student IDs
+    const uniqueStudentIds = [...new Set(studentElectives.map(se => se.studentId))];
+    console.log('   📋 Unique student IDs in electives (' + uniqueStudentIds.length + '):', uniqueStudentIds.slice(0, 5));
+    console.log('   🎯 Looking for student ID:', studentId, '(type:', typeof studentId + ')');
+    
+    // Check if the requested student ID exists in the array
+    const exists = uniqueStudentIds.includes(studentId);
+    console.log('   🔎 Student ID exists in array:', exists);
+    
+    if (!exists) {
+      console.warn('   ⚠️ Student ID NOT FOUND in studentElectives array');
+      console.warn('   💡 This student may not have selected any electives yet');
+      
+      // Log type comparison
+      const firstStudentId = studentElectives[0]?.studentId;
+      if (firstStudentId) {
+        console.log('   🔍 Type comparison:');
+        console.log('      - Requested ID type:', typeof studentId);
+        console.log('      - Stored ID type:', typeof firstStudentId);
+        console.log('      - Requested ID:', studentId);
+        console.log('      - First stored ID:', firstStudentId);
+        console.log('      - Are they equal?:', studentId === firstStudentId);
+      }
+    }
     
     const filtered = studentElectives.filter(se => se.studentId === studentId);
     console.log('   ✅ Filtered electives for this student:', filtered.length);
     
     if (filtered.length > 0) {
-      console.log('   📝 Sample selection:', {
+      console.log('   📝 First selection:', {
         id: filtered[0].id,
         electiveId: filtered[0].electiveId,
         track: filtered[0].track,
         semester: filtered[0].semester
       });
-    } else {
-      console.warn('   ⚠️ No electives found for student ID:', studentId);
-      console.warn('   💡 Check if student ID matches the IDs in studentElectives array');
     }
     
     return filtered;

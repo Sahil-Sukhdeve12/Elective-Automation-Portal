@@ -83,6 +83,23 @@ const AdminStudents: React.FC = () => {
 
   // Get students from DataContext
   const allStudents: Student[] = students;
+  
+  // Debug logging for students
+  console.log('👥 [AdminStudents] Total students from context:', students.length);
+  if (students.length > 0) {
+    console.log('   📋 First student:', {
+      id: students[0].id,
+      name: students[0].name,
+      department: students[0].department,
+      semester: students[0].semester,
+      section: students[0].section
+    });
+  } else {
+    console.error('   ❌ Students array is EMPTY!');
+    console.error('   ❌ Check DataContext - students should be loaded from backend or localStorage');
+  }
+  console.log('📊 [AdminStudents] studentElectives length:', studentElectives.length);
+  console.log('⏳ [AdminStudents] isLoadingStudentData:', isLoadingStudentData);
 
   // Use admin-configured departments, sections, and semesters
   const departments = getAvailableDepartments();

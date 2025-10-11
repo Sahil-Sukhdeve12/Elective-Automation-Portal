@@ -2709,6 +2709,135 @@ async function initializeDatabase() {
   }
 }
 
+// Admin-only endpoint to fix student elective selections
+app.post('/api/admin/fix-selections', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Admin access required' 
+      });
+    }
+
+    console.log('🔧 Starting to fix student selections...');
+
+    // Get all current students
+    const students = await User.find({ role: 'student' });
+    console.log(`📋 Found ${students.length} students`);
+
+    // Get all electives
+    const electives = await Elective.find({});
+    console.log(`📚 Found ${electives.length} electives`);
+
+    if (electives.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No electives in database'
+      });
+    }
+
+    // Get current student IDs
+    const currentStudentIds = students.map(s => s._id);
+
+    // Delete old selections from deleted/non-existent students
+    const deleteResult = await StudentElectiveSelection.deleteMany({
+      studentId: { $nin: currentStudentIds }
+    });
+    console.log(`🗑️ Deleted ${deleteResult.deletedCount} old selections`);
+
+    // Check existing selections for current students
+    const existingSelections = await StudentElectiveSelection.find({
+      studentId: { $in: currentStudentIds }
+    });
+    console.log(`✅ Current students have ${existingSelections.length} existing selections`);
+
+    // Create selections for students who don't have any
+    const newSelections = [];
+    let createdCount = 0;
+
+    for (const student of students) {
+      // Check if student already has selections
+      const hasSelections = existingSelections.some(
+        sel => sel.studentId.toString() === student._id.toString()
+      );
+
+      if (hasSelections) {
+        console.log(`⏭️ ${student.name} already has selections, skipping`);
+        continue;
+      }
+
+      // Give each student 1-3 random electives
+      const numElectives = Math.floor(Math.random() * 3) + 1;
+      const studentSemester = student.semester || 5;
+
+      // Get suitable electives
+      const suitableElectives = electives.filter(e => 
+        !e.semester || Math.abs(e.semester - studentSemester) <= 1
+      );
+
+      if (suitableElectives.length === 0) continue;
+
+      // Randomly select electives
+      const selectedElectives = [];
+      for (let i = 0; i < numElectives && i < suitableElectives.length; i++) {
+        const randomIndex = Math.floor(Math.random() * suitableElectives.length);
+        const elective = suitableElectives[randomIndex];
+
+        if (!selectedElectives.find(e => e._id.toString() === elective._id.toString())) {
+          selectedElectives.push(elective);
+        }
+      }
+
+      // Create selections
+      for (const elective of selectedElectives) {
+        newSelections.push({
+          studentId: student._id,
+          electiveId: elective._id,
+          semester: studentSemester,
+          track: elective.track || 'General',
+          category: elective.category || ['Departmental'],
+          status: 'selected',
+          selectedAt: new Date(),
+          createdAt: new Date()
+        });
+        createdCount++;
+      }
+
+      console.log(`✅ Prepared ${selectedElectives.length} selections for ${student.name}`);
+    }
+
+    // Insert all new selections
+    if (newSelections.length > 0) {
+      await StudentElectiveSelection.insertMany(newSelections);
+      console.log(`🎉 Created ${createdCount} new selections`);
+    }
+
+    // Get final count
+    const finalCount = await StudentElectiveSelection.countDocuments({});
+
+    res.json({
+      success: true,
+      message: 'Student selections fixed successfully',
+      stats: {
+        totalStudents: students.length,
+        deletedOldSelections: deleteResult.deletedCount,
+        existingSelections: existingSelections.length,
+        newSelectionsCreated: createdCount,
+        totalSelections: finalCount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fixing selections:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fix selections',
+      details: error.message
+    });
+  }
+});
+
 app.listen(PORT, async () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`📡 API endpoint: http://localhost:${PORT}/api`);

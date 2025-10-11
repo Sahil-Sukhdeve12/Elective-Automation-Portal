@@ -7,7 +7,7 @@ import ProgressBar from '../../components/common/ProgressBar';
 
 const StudentDashboard: React.FC = () => {
   const { user } = useAuth();
-  const { electives, tracks, getStudentElectives, getRecommendations, getActiveAlerts } = useData();
+  const { electives, tracks, getStudentElectives, getRecommendations, getActiveAlerts, isLoadingStudentData } = useData();
 
   if (!user || user.role !== 'student') return null;
 
@@ -18,8 +18,8 @@ const StudentDashboard: React.FC = () => {
   // Get alerts relevant to the student
   const relevantAlerts = getActiveAlerts(user.department, user.semester);
 
-  // Show basic content if no data is loaded yet
-  if (electives.length === 0) {
+  // Show basic content if data is still loading
+  if (isLoadingStudentData) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">

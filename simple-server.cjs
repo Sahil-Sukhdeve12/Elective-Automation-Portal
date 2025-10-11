@@ -23,20 +23,20 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
-  
+  console.log(`${req.method} ${req.path}`);
   if (req.headers.authorization) {
-    
+    console.log('✓ Auth token present');
   } else {
-    
+    console.log('✗ No auth token');
   }
   next();
 });
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI).then(() => {
-  
+  console.log('✅ Connected to MongoDB successfully');
 }).catch((error) => {
-  
+  console.error('❌ MongoDB connection error:', error);
 });
 
 // User schema

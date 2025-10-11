@@ -1224,36 +1224,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadData = async () => {
       console.log('🔄 Loading data from backend...');
       
-      // PRIORITY 1: Load electives FIRST (most critical for student dashboard)
-      console.log('🚀 PRIORITY: Loading electives first...');
-      const backendElectives = await fetchElectives();
-      
-      if (backendElectives.length > 0) {
-        console.log('✅ Loaded electives from backend:', backendElectives.length);
-        setElectives(backendElectives);
-        localStorage.setItem('electives', JSON.stringify(backendElectives));
-        // STOP LOADING IMMEDIATELY after electives are loaded
-        console.log('✅ Electives loaded - stopping loading state');
-        setIsLoadingStudentData(false);
-      } else {
-        // Fallback to stored or initial data
-        const storedElectives = localStorage.getItem('electives');
-        if (storedElectives) {
-          const parsedElectives = JSON.parse(storedElectives);
-          console.log('📦 Using stored electives:', parsedElectives.length);
-          setElectives(parsedElectives);
-          setIsLoadingStudentData(false);
-        } else {
-          console.log('📝 Using initial electives data');
-          setElectives(initialElectives);
-          localStorage.setItem('electives', JSON.stringify(initialElectives));
-          setIsLoadingStudentData(false);
-        }
-      }
-      
-      // Load remaining data in background (non-blocking)
-      console.log('🔄 Loading remaining data in background...');
-      
       // Fetch system config from database
       try {
         const systemConfig = await systemConfigApi.getConfig();
@@ -1283,12 +1253,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Keep the default values already set in state
       }
       
-      // Load other data in parallel
-      const [backendTracks, backendUsers, backendSyllabi] = await Promise.all([
+      // OPTIMIZATION: Fetch data in parallel for faster loading
+      const [backendElectives, backendTracks, backendUsers, backendSyllabi] = await Promise.all([
+        fetchElectives(),
         fetchTracks(),
         fetchUsers(),
         fetchSyllabi()
       ]);
+      
+      // Process electives
+      if (backendElectives.length > 0) {
+        console.log('✅ Loaded electives from backend:', backendElectives.length);
+        setElectives(backendElectives);
+        localStorage.setItem('electives', JSON.stringify(backendElectives));
+      } else {
+        // Fallback to stored or initial data
+        const storedElectives = localStorage.getItem('electives');
+        if (storedElectives) {
+          setElectives(JSON.parse(storedElectives));
+        } else {
+          setElectives(initialElectives);
+          localStorage.setItem('electives', JSON.stringify(initialElectives));
+        }
+      }
+      
       
       // Process tracks
       if (backendTracks.length > 0) {
@@ -1453,20 +1441,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
       
-      // Background data loaded
-      console.log('✅ All background data loading complete');
+      // All student data loaded - set loading to false
+      console.log('✅ Student data loading complete');
+      setIsLoadingStudentData(false);
     };
 
     loadData().catch((error) => {
       console.error('❌ Error loading data:', error);
-      // Loading already stopped after electives loaded
+      setIsLoadingStudentData(false);
     });
     
-    // Failsafe: Set loading to false after 2 seconds if electives haven't loaded
+    // Failsafe: Set loading to false after 5 seconds if data hasn't loaded
     const loadingTimeout = setTimeout(() => {
       console.log('⏱️ Loading timeout reached, forcing loading state to false');
       setIsLoadingStudentData(false);
-    }, 2000);
+    }, 5000);
 
     // Initialize other data from localStorage or use defaults
     const storedElectiveFeedbacks = localStorage.getItem('electiveFeedbacks');

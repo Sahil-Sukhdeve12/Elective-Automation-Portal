@@ -197,7 +197,7 @@ const StudentRoadmap: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  📖 Elective Syllabi ({electiveSyllabi.length})
+                  📖 Elective Syllabus ({electiveSyllabi.length})
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   View and download syllabus for individual electives

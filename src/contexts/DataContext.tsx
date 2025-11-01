@@ -1205,6 +1205,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [studentElectives, setStudentElectives] = useState<StudentElective[]>([]);
   const [electiveFeedbacks, setElectiveFeedbacks] = useState<ElectiveFeedbackForm[]>([]);
   const [isLoadingStudentData, setIsLoadingStudentData] = useState<boolean>(true); // NEW: Loading state
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('authToken')); // Track auth token changes
   
   // Admin-configured data - will be loaded from database
   const [adminDepartments, setAdminDepartments] = useState<string[]>([]);
@@ -1218,6 +1219,54 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   // Syllabus management
   const [syllabi, setSyllabi] = useState<Syllabus[]>([]);
+
+  // Listen for storage events to detect auth token changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newToken = localStorage.getItem('authToken');
+      setAuthToken(newToken);
+    };
+
+    // Listen for custom event when auth token changes
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('authTokenChanged', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authTokenChanged', handleStorageChange);
+    };
+  }, []);
+
+  // Separate useEffect to reload student electives when auth token changes
+  useEffect(() => {
+    if (authToken) {
+      console.log('🔄 Auth token detected, reloading student electives...');
+      const reloadStudentElectives = async () => {
+        setIsLoadingStudentData(true);
+        
+        try {
+          const payload = JSON.parse(atob(authToken.split('.')[1]));
+          const isAdmin = payload.role === 'admin';
+          
+          const backendSelections = isAdmin 
+            ? await fetchAllStudentSelections()
+            : await fetchStudentSelections();
+          
+          if (backendSelections.length > 0) {
+            console.log('✅ Reloaded student selections:', backendSelections.length);
+            setStudentElectives(backendSelections);
+            localStorage.setItem('studentElectives', JSON.stringify(backendSelections));
+          }
+        } catch (error) {
+          console.error('❌ Error reloading student electives:', error);
+        } finally {
+          setIsLoadingStudentData(false);
+        }
+      };
+      
+      reloadStudentElectives();
+    }
+  }, [authToken]); // Reload when auth token changes
 
   useEffect(() => {
     // Load data from backend API
@@ -1382,28 +1431,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Fetch student selections from backend
-      // FIRST: Always try to load from localStorage for instant display
-      const storedSelections = localStorage.getItem('studentElectives');
-      if (storedSelections) {
-        try {
-          const parsedSelections = JSON.parse(storedSelections);
-          console.log('⚡ [loadData] INSTANT LOAD from cache:', parsedSelections.length, 'selections');
-          setStudentElectives(parsedSelections);
-          setIsLoadingStudentData(false); // Data available immediately!
-        } catch (error) {
-          console.warn('⚠️ [loadData] Could not parse cached selections:', error);
-        }
-      }
-      
-      // THEN: Check if we can refresh from backend
+      // ALWAYS fetch from backend when auth token exists (don't rely only on cache)
       const authToken = localStorage.getItem('authToken');
-      console.log('🔑 [loadData] Checking auth token for backend sync...');
+      console.log('🔑 [loadData] Checking auth token for student selections...');
       console.log('   - Token exists:', !!authToken);
       
       if (!authToken) {
-        console.warn('⚠️ [loadData] No auth token - using cached data only');
-        console.warn('💡 Login to sync latest data from server');
-        // Already loaded from cache above, so we're done
+        console.warn('⚠️ [loadData] No auth token - checking localStorage cache...');
+        // Try to load from cache if no auth token
+        const storedSelections = localStorage.getItem('studentElectives');
+        if (storedSelections) {
+          try {
+            const parsedSelections = JSON.parse(storedSelections);
+            console.log('📦 [loadData] Loaded from cache:', parsedSelections.length, 'selections');
+            setStudentElectives(parsedSelections);
+          } catch (error) {
+            console.warn('⚠️ [loadData] Could not parse cached selections:', error);
+          }
+        } else {
+          console.warn('❌ [loadData] No cached selections found');
+        }
+        setIsLoadingStudentData(false);
         return;
       }
       
@@ -1418,11 +1466,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('   - User ID:', payload.userId);
       } catch (error) {
         console.error('⚠️ [loadData] Could not decode auth token:', error);
-        // Use cached data if token is invalid
+        setIsLoadingStudentData(false);
         return;
       }
       
-      console.log('🔄 [loadData] Syncing student selections from backend...');
+      console.log('🔄 [loadData] Fetching fresh student selections from backend...');
       console.log('   - isAdmin:', isAdmin);
       console.log('   - API endpoint:', isAdmin ? '/api/student/all-selections' : '/api/student/selections');
       

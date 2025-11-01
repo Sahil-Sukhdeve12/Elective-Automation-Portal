@@ -133,6 +133,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Store token in localStorage for persistence
         localStorage.setItem('authToken', response.token);
         
+        // Dispatch custom event to notify DataContext of auth token change
+        window.dispatchEvent(new Event('authTokenChanged'));
+        
         // Update user state
         setUser(response.user);
         
@@ -178,6 +181,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.token && response.user) {
         // Store token and log in user immediately
         localStorage.setItem('authToken', response.token);
+        
+        // Dispatch custom event to notify DataContext of auth token change
+        window.dispatchEvent(new Event('authTokenChanged'));
+        
         setUser(response.user);
         
         console.log('Registration successful for user:', response.user.email);
@@ -205,6 +212,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Remove stored authentication data
     localStorage.removeItem('authToken');
+    
+    // Dispatch custom event to notify DataContext of auth token removal
+    window.dispatchEvent(new Event('authTokenChanged'));
     
     console.log('User logged out successfully');
   };

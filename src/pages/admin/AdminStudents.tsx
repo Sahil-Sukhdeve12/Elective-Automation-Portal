@@ -292,8 +292,8 @@ const AdminStudents: React.FC = () => {
         const studentElectivesData = getStudentElectives(student.id);
         
         if (reportFilters.elective) {
-          // Filter by specific elective
-          return studentElectivesData.some(se => se.electiveId === reportFilters.elective);
+          // Filter by specific elective - convert IDs to strings for comparison
+          return studentElectivesData.some(se => String(se.electiveId || '') === String(reportFilters.elective || ''));
         } else if (reportFilters.track) {
           // Filter by specific track
           return studentElectivesData.some(se => se.track === reportFilters.track);
@@ -354,7 +354,8 @@ const AdminStudents: React.FC = () => {
       console.log('📝 [Report] All semesters electives:', allStudentElectives.length);
       
       const electivesList = studentElectivesData.map(se => {
-        const elective = electives.find(e => e.id === se.electiveId);
+        // Convert IDs to strings for proper comparison (handles ObjectIds)
+        const elective = electives.find(e => String(e.id || '') === String(se.electiveId || ''));
         const electiveName = elective ? `${elective.name} (${elective.code})` : 'Unknown';
         console.log('  - Elective:', electiveName, 'ID:', se.electiveId, 'Semester:', se.semester, 'Track:', se.track);
         return electiveName;
@@ -369,7 +370,7 @@ const AdminStudents: React.FC = () => {
         primaryTrack = reportFilters.track;
       } else if (reportFilters.elective) {
         // If filtering by specific elective, get the track for that elective
-        const selectedElective = electives.find(e => e.id === reportFilters.elective);
+        const selectedElective = electives.find(e => String(e.id || '') === String(reportFilters.elective || ''));
         primaryTrack = selectedElective ? selectedElective.track : 'No track selected';
       } else if (reportFilters.category) {
         // If filtering by category, show primary track from that category
@@ -493,7 +494,8 @@ const AdminStudents: React.FC = () => {
       // Get student's electives
       const studentElectivesData = getStudentElectives(student.id);
       const electivesList = studentElectivesData.map(se => {
-        const elective = electives.find(e => e.id === se.electiveId);
+        // Convert IDs to strings for proper comparison (handles ObjectIds)
+        const elective = electives.find(e => String(e.id || '') === String(se.electiveId || ''));
         return elective ? `${elective.name} (${elective.code})` : 'Unknown';
       }).join('; ');
       

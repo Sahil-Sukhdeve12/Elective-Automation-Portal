@@ -3,7 +3,7 @@
 ## Problem
 The browser is using **old cached data** from localStorage that doesn't have section information.
 
-## Solution 
+## Solution  
 
 ### Option 1: Clear localStorage via Console (RECOMMENDED)
 1. Open your browser DevTools (F12)

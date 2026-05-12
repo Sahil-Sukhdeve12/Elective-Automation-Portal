@@ -319,32 +319,81 @@ const AdminStudents: React.FC = () => {
     
     console.log('📊 [Report] Generating report for', reportStudents.length, 'students');
     console.log('📊 [Report] Total studentElectives available:', studentElectives.length);
+    console.log('📊 [Report] Report filters:', reportFilters);
     
     return reportStudents.map(student => {
       console.log('👤 [Report] Processing student:', student.name, 'ID:', student.id);
       
-      // Get student's electives - FILTERED BY STUDENT'S CURRENT SEMESTER
+      // Get student's electives - INCLUDE ALL SEMESTERS WHEN FILTERING BY TRACK/ELECTIVE
       const allStudentElectives = getStudentElectives(student.id);
       
-      // Filter electives to show only those for the student's current semester
-      const studentElectivesData = allStudentElectives.filter(se => se.semester === student.semester);
+      // If filtering by specific track or elective, include electives from ALL semesters
+      // Otherwise, filter to show only current semester electives
+      let studentElectivesData = allStudentElectives;
       
-      console.log('📝 [Report] Student electives found (current semester):', studentElectivesData.length);
+      if (reportFilters.track) {
+        // Filter to only the selected track (from all semesters)
+        studentElectivesData = allStudentElectives.filter(se => se.track === reportFilters.track);
+        console.log('📝 [Report] Filtered to track:', reportFilters.track, '- Count:', studentElectivesData.length);
+      } else if (reportFilters.elective) {
+        // Filter to only the selected elective (from all semesters)
+        studentElectivesData = allStudentElectives.filter(se => se.electiveId === reportFilters.elective);
+        console.log('📝 [Report] Filtered to elective:', reportFilters.elective, '- Count:', studentElectivesData.length);
+      } else if (reportFilters.category) {
+        // Filter by category - include electives from all semesters for this category
+        const categoryTracks = getTracksByCategory(reportFilters.category).map(t => t.name);
+        studentElectivesData = allStudentElectives.filter(se => categoryTracks.includes(se.track));
+        console.log('📝 [Report] Filtered to category:', reportFilters.category, '- Count:', studentElectivesData.length);
+      } else {
+        // No specific filter - only show current semester electives
+        studentElectivesData = allStudentElectives.filter(se => se.semester === student.semester);
+        console.log('📝 [Report] Filtered to current semester - Count:', studentElectivesData.length);
+      }
+      
+      console.log('📝 [Report] Student electives found:', studentElectivesData.length);
       console.log('📝 [Report] All semesters electives:', allStudentElectives.length);
       
       const electivesList = studentElectivesData.map(se => {
         const elective = electives.find(e => e.id === se.electiveId);
         const electiveName = elective ? `${elective.name} (${elective.code})` : 'Unknown';
-        console.log('  - Elective:', electiveName, 'ID:', se.electiveId, 'Semester:', se.semester);
+        console.log('  - Elective:', electiveName, 'ID:', se.electiveId, 'Semester:', se.semester, 'Track:', se.track);
         return electiveName;
       }).join('; ');
       
       console.log('📋 [Report] Electives list for', student.name, ':', electivesList || 'No electives selected');
       
-      // Get primary track (track with most electives) - only from current semester
-      const primaryTrack = getPrimaryTrack(student.id, student.semester);
+      // Get primary track (track with most electives)
+      let primaryTrack = 'No track selected';
+      if (reportFilters.track) {
+        // If filtering by specific track, show that track
+        primaryTrack = reportFilters.track;
+      } else if (reportFilters.elective) {
+        // If filtering by specific elective, get the track for that elective
+        const selectedElective = electives.find(e => e.id === reportFilters.elective);
+        primaryTrack = selectedElective ? selectedElective.track : 'No track selected';
+      } else if (reportFilters.category) {
+        // If filtering by category, show primary track from that category
+        const trackCounts = studentElectivesData.reduce((acc: Record<string, number>, se) => {
+          acc[se.track] = (acc[se.track] || 0) + 1;
+          return acc;
+        }, {});
+        if (Object.keys(trackCounts).length > 0) {
+          const sortedTracks = Object.entries(trackCounts).sort((a, b) => b[1] - a[1]);
+          primaryTrack = sortedTracks[0][0];
+        }
+      } else {
+        // Get primary track (track with most electives) from current semester
+        const trackCounts = studentElectivesData.reduce((acc: Record<string, number>, se) => {
+          acc[se.track] = (acc[se.track] || 0) + 1;
+          return acc;
+        }, {});
+        if (Object.keys(trackCounts).length > 0) {
+          const sortedTracks = Object.entries(trackCounts).sort((a, b) => b[1] - a[1]);
+          primaryTrack = sortedTracks[0][0];
+        }
+      }
       
-      // Get all student's tracks - only from current semester
+      // Get all student's tracks
       const studentTracks = [...new Set(studentElectivesData.map(se => se.track))].join('; ');
       
       return {
